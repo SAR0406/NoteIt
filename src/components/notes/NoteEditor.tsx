@@ -18,6 +18,7 @@ import { formatDate } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { DocumentWorkspace } from '@/components/documents/DocumentWorkspace';
 import { HandwritingPad } from './HandwritingPad';
+import { AI_FLASHCARD_CARD_LIMIT, AI_QUIZ_CARD_LIMIT, AI_SUMMARY_POINT_LIMIT } from '@/lib/ai/constants';
 
 export function NoteEditor() {
   const {
@@ -107,7 +108,7 @@ export function NoteEditor() {
       };
 
       if (action === 'summarize') {
-        const points = (data.summaryPoints ?? []).filter(Boolean).slice(0, 8);
+        const points = (data.summaryPoints ?? []).filter(Boolean).slice(0, AI_SUMMARY_POINT_LIMIT);
         if (points.length === 0) {
           applyLocalFallback(action);
           toast.success('Summary added (local fallback)');
@@ -117,7 +118,9 @@ export function NoteEditor() {
           toast.success('NVIDIA NIM summary added!');
         }
       } else {
-        const cards = (data.flashcards ?? []).filter((c) => c.front && c.back).slice(0, action === 'quiz' ? 8 : 6);
+        const cards = (data.flashcards ?? [])
+          .filter((c) => c.front && c.back)
+          .slice(0, action === 'quiz' ? AI_QUIZ_CARD_LIMIT : AI_FLASHCARD_CARD_LIMIT);
         if (cards.length === 0) {
           applyLocalFallback(action);
           toast.success(`${action === 'quiz' ? 'Quiz' : 'Flashcards'} generated (local fallback)`);
