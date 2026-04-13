@@ -23,7 +23,7 @@ export function NoteEditor() {
   const {
     notes, selectedNoteId, updateNote, deleteNote, toggleFavorite, togglePin,
     addTagToNote, removeTagFromNote, linkNotes, unlinkNote,
-    generateFlashcardsFromNote, summarizeNote, generateQuizFromNote,
+    generateFlashcardsFromNote, summarizeNote, generateQuizFromNote, addFlashcard,
     selectNote, addNote, selectedTopicId, selectedSubjectId, selectedNotebookId,
   } = useStore();
 
@@ -66,19 +66,69 @@ export function NoteEditor() {
     }
   }, [editor, note]);
 
+  const escapeHtml = (value: string) =>
+    value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+  const applyLocalFallback = (action: 'summarize' | 'flashcards' | 'quiz') => {
+    if (!note) return;
+    if (action === 'summarize') summarizeNote(note.id);
+    else if (action === 'flashcards') generateFlashcardsFromNote(note.id);
+    else generateQuizFromNote(note.id);
+  };
+
   const handleAI = async (action: 'summarize' | 'flashcards' | 'quiz') => {
     if (!note) return;
     setAiLoading(true);
-    await new Promise((r) => setTimeout(r, 800));
-    if (action === 'summarize') {
-      summarizeNote(note.id);
-      toast.success('Summary added to note!');
-    } else if (action === 'flashcards') {
-      generateFlashcardsFromNote(note.id);
-      toast.success('Flashcards generated!');
-    } else {
-      generateQuizFromNote(note.id);
-      toast.success('Quiz cards generated!');
+    try {
+      const response = await fetch('/api/ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action,
+          note: {
+            title: note.title,
+            content: note.content,
+            tags: note.tags,
+            handwritingIndex: note.handwritingIndex,
+            attachments: note.attachments,
+            drawings: note.drawings,
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        const err = (await response.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(err?.error || 'AI provider unavailable');
+      }
+
+      const data = (await response.json()) as {
+        summaryPoints?: string[];
+        flashcards?: Array<{ front: string; back: string }>;
+      };
+
+      if (action === 'summarize') {
+        const points = (data.summaryPoints ?? []).filter(Boolean).slice(0, 8);
+        if (points.length === 0) {
+          applyLocalFallback(action);
+          toast.success('Summary added (local fallback)');
+        } else {
+          const summaryHtml = `<h3>📝 AI Summary</h3><ul>${points.map((point) => `<li>${escapeHtml(point)}</li>`).join('')}</ul>`;
+          updateNote(note.id, { content: `${note.content}<hr>${summaryHtml}` });
+          toast.success('NVIDIA NIM summary added!');
+        }
+      } else {
+        const cards = (data.flashcards ?? []).filter((c) => c.front && c.back).slice(0, action === 'quiz' ? 8 : 6);
+        if (cards.length === 0) {
+          applyLocalFallback(action);
+          toast.success(`${action === 'quiz' ? 'Quiz' : 'Flashcards'} generated (local fallback)`);
+        } else {
+          cards.forEach((card) => addFlashcard(card.front, card.back, note.id, note.tags));
+          toast.success(`NVIDIA NIM ${action === 'quiz' ? 'quiz cards' : 'flashcards'} generated!`);
+        }
+      }
+    } catch {
+      applyLocalFallback(action);
+      toast.success(`${action === 'quiz' ? 'Quiz' : action === 'summarize' ? 'Summary' : 'Flashcards'} generated (local fallback)`);
     }
     setAiLoading(false);
   };

@@ -14,7 +14,7 @@ A comprehensive note-taking web application designed specifically for MBBS/medic
 | 🕸️ **Graph View** | Visual canvas showing note connections |
 | 🎧 **Audio Recording** | Record lectures with timestamped annotations |
 | 🎨 **Medical Templates** | SOAP Note, Case Sheet, Anatomy, Pharmacology |
-| 🤖 **AI Tools** | Auto-summarize notes, generate flashcards from headings |
+| 🤖 **AI Tools (NVIDIA NIM)** | AI summarize, quiz, and flashcard generation with OCR/handwriting context |
 | 🔍 **Full-text Search** | Search by title, content, or tags |
 | 💾 **Auto-save** | All data persisted to localStorage, no login needed |
 | 📌 **Pin & Favorite** | Quickly access important notes |
@@ -28,9 +28,21 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000)
 
+### AI setup (NVIDIA NIM)
+
+```bash
+cp .env.example .env.local
+```
+
+Configure:
+
+- `NVIDIA_API_KEY`: your NIM API key
+- `NVIDIA_NIM_MODEL`: default `openai/gpt-oss-120b`
+- `NVIDIA_NIM_USE_CASE`: default `Retrieval Augmented Generation` (best fit for MBBS note + OCR context)
+
 ## 🧰 Tech Stack
 
-- **Framework**: Next.js 14 (App Router)
+- **Framework**: Next.js 16 (App Router)
 - **Language**: TypeScript
 - **Styling**: Tailwind CSS
 - **Editor**: Tiptap (rich text)
