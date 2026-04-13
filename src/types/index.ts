@@ -1,5 +1,23 @@
 export type NoteType = 'text' | 'pdf' | 'audio' | 'drawing';
 
+export interface NoteAttachment {
+  id: string;
+  name: string;
+  mimeType: string;
+  dataUrl: string;
+  annotationLayerDataUrl: string | null;
+  indexedText: string;
+  createdAt: string;
+}
+
+export interface DrawingLayer {
+  id: string;
+  name: string;
+  dataUrl: string;
+  indexedText: string;
+  createdAt: string;
+}
+
 export interface Notebook {
   id: string;
   name: string;
@@ -41,6 +59,9 @@ export interface Note {
   audioUrl: string | null;
   audioTimestamps: AudioTimestamp[];
   templateType: TemplateType | null;
+  attachments: NoteAttachment[];
+  drawings: DrawingLayer[];
+  handwritingIndex: string;
   isFavorite: boolean;
   isPinned: boolean;
   createdAt: string;
@@ -95,4 +116,6 @@ export type AppView =
   | 'graph'
   | 'templates'
   | 'audio'
-  | 'search';
+  | 'search'
+  | 'documents'
+  | 'sync';

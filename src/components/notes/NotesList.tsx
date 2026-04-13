@@ -1,7 +1,7 @@
 'use client';
 import React from 'react';
 import { useStore } from '@/store/useStore';
-import { Star, Pin, Plus, Search, Filter, Tag, Edit3 } from 'lucide-react';
+import { Star, Plus, Edit3 } from 'lucide-react';
 import { Note } from '@/types';
 import { formatDate } from '@/lib/utils';
 
@@ -36,7 +36,10 @@ export function NotesList() {
         (n) =>
           n.title.toLowerCase().includes(q) ||
           n.content.toLowerCase().includes(q) ||
-          n.tags.some((t) => t.toLowerCase().includes(q))
+          n.tags.some((t) => t.toLowerCase().includes(q)) ||
+          n.handwritingIndex.toLowerCase().includes(q) ||
+          n.attachments.some((a) => a.indexedText.toLowerCase().includes(q)) ||
+          n.drawings.some((d) => d.indexedText.toLowerCase().includes(q))
       );
     }
 

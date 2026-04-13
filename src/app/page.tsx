@@ -10,12 +10,14 @@ import { AudioView } from '@/components/audio/AudioView';
 import { TemplatesView } from '@/components/templates/TemplatesView';
 import { SearchView } from '@/components/search/SearchView';
 import { HomeView } from '@/components/HomeView';
+import { DocumentsView } from '@/components/documents/DocumentsView';
+import { SyncView } from '@/components/sync/SyncView';
 import { Toaster } from 'react-hot-toast';
 
 export default function AppPage() {
   const { activeView } = useStore();
 
-  const showNotesList = activeView === 'notes' || activeView === 'note-editor';
+  const showNotesList = activeView === 'notes' || activeView === 'note-editor' || activeView === 'documents';
 
   return (
     <div className="flex h-screen overflow-hidden bg-white">
@@ -37,6 +39,8 @@ export default function AppPage() {
           {activeView === 'audio' && <AudioView />}
           {activeView === 'templates' && <TemplatesView />}
           {activeView === 'search' && <SearchView />}
+          {activeView === 'documents' && <DocumentsView />}
+          {activeView === 'sync' && <SyncView />}
         </div>
       </div>
     </div>

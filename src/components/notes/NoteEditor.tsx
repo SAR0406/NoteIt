@@ -1,5 +1,6 @@
 'use client';
-import React, { useState, useCallback } from 'react';
+
+import React, { useState } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Highlight from '@tiptap/extension-highlight';
@@ -10,17 +11,18 @@ import { useStore } from '@/store/useStore';
 import {
   Bold, Italic, Underline as UnderlineIcon, Highlighter, List, ListOrdered,
   Heading1, Heading2, Heading3, Link as LinkIcon, Minus, Star, Pin, Tag,
-  Trash2, Brain, Mic, Sparkles, BookOpen, X, Plus, ChevronDown,
-  AlignLeft, Code, Quote, MoreHorizontal,
+  Trash2, Brain, Sparkles, BookOpen, X, AlignLeft, Code, Quote, PanelRightOpen,
 } from 'lucide-react';
 import { MEDICAL_TAGS } from '@/lib/templates';
 import { formatDate } from '@/lib/utils';
 import toast from 'react-hot-toast';
+import { DocumentWorkspace } from '@/components/documents/DocumentWorkspace';
+import { HandwritingPad } from './HandwritingPad';
 
 export function NoteEditor() {
   const {
     notes, selectedNoteId, updateNote, deleteNote, toggleFavorite, togglePin,
-    addTagToNote, removeTagFromNote, linkNotes, unlinkNote, setActiveView,
+    addTagToNote, removeTagFromNote, linkNotes, unlinkNote,
     generateFlashcardsFromNote, summarizeNote, generateQuizFromNote,
     selectNote, addNote, selectedTopicId, selectedSubjectId, selectedNotebookId,
   } = useStore();
@@ -32,42 +34,44 @@ export function NoteEditor() {
   const [customTag, setCustomTag] = useState('');
   const [editingTitle, setEditingTitle] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
+  const [splitMode, setSplitMode] = useState(false);
 
-  const editor = useEditor({
-    extensions: [
-      StarterKit.configure({ underline: false }),
-      Highlight.configure({ multicolor: false }),
-      Underline,
-      TextStyle,
-      Link.configure({ openOnClick: false, HTMLAttributes: { class: 'text-blue-600 underline' } }),
-    ],
-    content: note?.content ?? '',
-    onUpdate: ({ editor }) => {
-      if (note) {
-        updateNote(note.id, { content: editor.getHTML() });
-      }
-    },
-    editorProps: {
-      attributes: {
-        class: 'prose prose-sm max-w-none focus:outline-none min-h-[400px] px-1',
+  const editor = useEditor(
+    {
+      extensions: [
+        StarterKit.configure({ underline: false, link: false }),
+        Highlight.configure({ multicolor: false }),
+        Underline,
+        TextStyle,
+        Link.configure({ openOnClick: false, HTMLAttributes: { class: 'text-blue-600 underline' } }),
+      ],
+      content: note?.content ?? '',
+      onUpdate: ({ editor: currentEditor }) => {
+        if (note) {
+          updateNote(note.id, { content: currentEditor.getHTML() });
+        }
+      },
+      editorProps: {
+        attributes: {
+          class: 'prose prose-sm max-w-none focus:outline-none min-h-[420px] px-1',
+        },
       },
     },
-  }, [note?.id]);
+    [note?.id, updateNote]
+  );
 
-  // Sync editor content when note changes
   React.useEffect(() => {
     if (editor && note && editor.getHTML() !== note.content) {
       editor.commands.setContent(note.content);
     }
-  }, [note?.id]);
+  }, [editor, note]);
 
-  const handleAI = useCallback(async (action: 'summarize' | 'flashcards' | 'quiz') => {
+  const handleAI = async (action: 'summarize' | 'flashcards' | 'quiz') => {
     if (!note) return;
     setAiLoading(true);
     await new Promise((r) => setTimeout(r, 800));
     if (action === 'summarize') {
       summarizeNote(note.id);
-      if (editor) editor.commands.setContent(notes.find((n) => n.id === note.id)?.content ?? '');
       toast.success('Summary added to note!');
     } else if (action === 'flashcards') {
       generateFlashcardsFromNote(note.id);
@@ -77,7 +81,7 @@ export function NoteEditor() {
       toast.success('Quiz cards generated!');
     }
     setAiLoading(false);
-  }, [note, editor, notes]);
+  };
 
   if (!note) {
     return (
@@ -103,7 +107,6 @@ export function NoteEditor() {
 
   return (
     <div className="flex-1 flex flex-col bg-white overflow-hidden">
-      {/* Toolbar */}
       <div className="border-b border-gray-200 bg-white px-4 py-2 flex items-center gap-1 flex-wrap">
         <ToolbarBtn onClick={() => editor?.chain().focus().toggleBold().run()} active={editor?.isActive('bold')} title="Bold">
           <Bold size={15} />
@@ -145,8 +148,14 @@ export function NoteEditor() {
         </ToolbarBtn>
         <div className="w-px h-5 bg-gray-200 mx-1" />
 
-        {/* Actions */}
         <div className="ml-auto flex items-center gap-1">
+          <button
+            onClick={() => setSplitMode((v) => !v)}
+            className={`p-1.5 rounded hover:bg-gray-100 ${splitMode ? 'text-indigo-600' : 'text-gray-400'}`}
+            title="Split-screen mode"
+          >
+            <PanelRightOpen size={15} />
+          </button>
           <button
             onClick={() => toggleFavorite(note.id)}
             className={`p-1.5 rounded hover:bg-gray-100 ${note.isFavorite ? 'text-yellow-500' : 'text-gray-400'}`}
@@ -162,10 +171,9 @@ export function NoteEditor() {
             <Pin size={15} />
           </button>
 
-          {/* Tags */}
           <div className="relative">
             <button
-              onClick={() => setShowTagDropdown(!showTagDropdown)}
+              onClick={() => setShowTagDropdown((v) => !v)}
               className="p-1.5 rounded hover:bg-gray-100 text-gray-500"
               title="Tags"
             >
@@ -189,7 +197,7 @@ export function NoteEditor() {
                   {MEDICAL_TAGS.filter((t) => !note.tags.includes(t)).map((tag) => (
                     <button
                       key={tag}
-                      onClick={() => { addTagToNote(note.id, tag); }}
+                      onClick={() => addTagToNote(note.id, tag)}
                       className="w-full text-left text-xs px-2 py-1 hover:bg-gray-100 rounded"
                     >
                       {tag}
@@ -214,10 +222,9 @@ export function NoteEditor() {
             )}
           </div>
 
-          {/* Link notes */}
           <div className="relative">
             <button
-              onClick={() => setShowLinkDropdown(!showLinkDropdown)}
+              onClick={() => setShowLinkDropdown((v) => !v)}
               className="p-1.5 rounded hover:bg-gray-100 text-gray-500"
               title="Link notes"
             >
@@ -251,12 +258,8 @@ export function NoteEditor() {
             )}
           </div>
 
-          {/* AI */}
           <div className="relative group">
-            <button
-              className={`p-1.5 rounded hover:bg-purple-50 text-purple-500 ${aiLoading ? 'animate-pulse' : ''}`}
-              title="AI Tools"
-            >
+            <button className={`p-1.5 rounded hover:bg-purple-50 text-purple-500 ${aiLoading ? 'animate-pulse' : ''}`} title="AI Tools">
               <Sparkles size={15} />
             </button>
             <div className="absolute right-0 top-full mt-1 w-44 bg-white border border-gray-200 rounded-xl shadow-lg z-50 p-1 hidden group-hover:block">
@@ -282,7 +285,6 @@ export function NoteEditor() {
         </div>
       </div>
 
-      {/* Note header */}
       <div className="px-6 pt-4 pb-2 border-b border-gray-100">
         {editingTitle ? (
           <input
@@ -301,8 +303,11 @@ export function NoteEditor() {
             {note.title}
           </h1>
         )}
-        <div className="flex items-center gap-3 mt-1">
+        <div className="flex items-center gap-3 mt-1 flex-wrap">
           <span className="text-xs text-gray-400">Updated {formatDate(note.updatedAt)}</span>
+          <span className="text-xs text-gray-500">Docs {note.attachments.length}</span>
+          <span className="text-xs text-gray-500">Drawings {note.drawings.length}</span>
+          {note.handwritingIndex && <span className="text-xs text-indigo-600">OCR indexed</span>}
           <div className="flex gap-1 flex-wrap">
             {note.tags.map((tag) => (
               <span key={tag} className="text-xs bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full">{tag}</span>
@@ -314,9 +319,14 @@ export function NoteEditor() {
         </div>
       </div>
 
-      {/* Editor */}
-      <div className="flex-1 overflow-y-auto px-6 py-4">
-        <EditorContent editor={editor} />
+      <div className="flex-1 overflow-hidden flex">
+        <div className={`overflow-y-auto px-6 py-4 ${splitMode ? 'w-[60%]' : 'w-full'}`}>
+          <EditorContent editor={editor} />
+          <div className="mt-6">
+            <HandwritingPad note={note} />
+          </div>
+        </div>
+        {splitMode && <DocumentWorkspace note={note} compact />}
       </div>
     </div>
   );

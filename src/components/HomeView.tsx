@@ -1,7 +1,7 @@
 'use client';
 import React from 'react';
 import { useStore } from '@/store/useStore';
-import { Brain, BookOpen, Star, Pin, Zap, LayoutTemplate, Mic, Link2, Plus, ChevronRight } from 'lucide-react';
+import { Brain, BookOpen, Star, LayoutTemplate, Mic, Link2, Plus, ChevronRight, Files, Cloud } from 'lucide-react';
 import { formatDate, isDue } from '@/lib/utils';
 
 export function HomeView() {
@@ -11,7 +11,6 @@ export function HomeView() {
   } = useStore();
 
   const dueCards = flashcards.filter((fc) => isDue(fc.dueDate));
-  const favorites = notes.filter((n) => n.isFavorite);
   const recentNotes = [...notes].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()).slice(0, 6);
 
   const handleNewNote = () => {
@@ -45,12 +44,14 @@ export function HomeView() {
         </div>
 
         {/* Quick actions */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-8">
           {[
             { icon: <BookOpen size={22} />, label: 'Browse Notes', view: 'notes' as const, color: 'bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100' },
             { icon: <Brain size={22} />, label: dueCards.length > 0 ? `Review ${dueCards.length} Cards` : 'Flashcards', view: 'flashcards' as const, color: `bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100 ${dueCards.length > 0 ? 'ring-2 ring-orange-300' : ''}` },
             { icon: <LayoutTemplate size={22} />, label: 'Templates', view: 'templates' as const, color: 'bg-green-50 border-green-200 text-green-700 hover:bg-green-100' },
             { icon: <Mic size={22} />, label: 'Audio Notes', view: 'audio' as const, color: 'bg-red-50 border-red-200 text-red-700 hover:bg-red-100' },
+            { icon: <Files size={22} />, label: 'PDF Workspace', view: 'documents' as const, color: 'bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100' },
+            { icon: <Cloud size={22} />, label: 'Sync Backup', view: 'sync' as const, color: 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100' },
           ].map(({ icon, label, view, color }) => (
             <button
               key={view}

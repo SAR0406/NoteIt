@@ -1,7 +1,7 @@
 'use client';
-import React, { useRef, useEffect, useState, useCallback } from 'react';
+import React, { useRef, useState } from 'react';
 import { useStore } from '@/store/useStore';
-import { Mic, MicOff, Play, Pause, Square, Clock, Plus, Trash2 } from 'lucide-react';
+import { Mic, Square, Clock, Plus } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
 import toast from 'react-hot-toast';
 
@@ -9,11 +9,7 @@ export function AudioView() {
   const { notes, updateNote, addNote, selectNote, setActiveView, selectedNotebookId, selectedSubjectId, selectedTopicId } = useStore();
 
   const [recording, setRecording] = useState(false);
-  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
-  const [playingNoteId, setPlayingNoteId] = useState<string | null>(null);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
   const [timestamps, setTimestamps] = useState<{ time: number; text: string }[]>([]);
   const [newTimestampText, setNewTimestampText] = useState('');
   const [selectedNoteForAudio, setSelectedNoteForAudio] = useState<string | null>(null);
@@ -21,8 +17,6 @@ export function AudioView() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-
-  const audioNotes = notes.filter((n) => n.audioUrl !== null || n === notes.find((nn) => nn.id === selectedNoteForAudio));
 
   const startRecording = async () => {
     try {
@@ -33,7 +27,6 @@ export function AudioView() {
       mr.onstop = () => {
         const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
         const url = URL.createObjectURL(blob);
-        setAudioBlob(blob);
         setAudioUrl(url);
         stream.getTracks().forEach((t) => t.stop());
       };
@@ -129,8 +122,6 @@ export function AudioView() {
               <audio
                 ref={audioRef}
                 src={audioUrl}
-                onTimeUpdate={() => setCurrentTime(audioRef.current?.currentTime ?? 0)}
-                onLoadedMetadata={() => setDuration(audioRef.current?.duration ?? 0)}
                 controls
                 className="w-full mb-3"
               />

@@ -1,5 +1,5 @@
 'use client';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from '@/store/useStore';
 import { Link2, ZoomIn, ZoomOut } from 'lucide-react';
 
@@ -18,24 +18,24 @@ export function GraphView() {
   const [panStart, setPanStart] = useState<{ x: number; y: number } | null>(null);
   const [hoveredNote, setHoveredNote] = useState<string | null>(null);
 
-  // Initialize positions
-  useEffect(() => {
-    if (notes.length === 0) return;
-    const newPos: Record<string, NodePos> = {};
-    const cx = 400, cy = 300, radius = 200;
+  const nodePositions = useMemo(() => {
+    const mapped: Record<string, NodePos> = {};
+    const cx = 400;
+    const cy = 300;
+    const radius = 200;
     notes.forEach((note, i) => {
-      if (!positions[note.id]) {
-        const angle = (i / notes.length) * 2 * Math.PI;
-        newPos[note.id] = {
-          x: cx + radius * Math.cos(angle),
-          y: cy + radius * Math.sin(angle),
-        };
-      } else {
-        newPos[note.id] = positions[note.id];
+      if (positions[note.id]) {
+        mapped[note.id] = positions[note.id];
+        return;
       }
+      const angle = (i / Math.max(notes.length, 1)) * 2 * Math.PI;
+      mapped[note.id] = {
+        x: cx + radius * Math.cos(angle),
+        y: cy + radius * Math.sin(angle),
+      };
     });
-    setPositions(newPos);
-  }, [notes.length]);
+    return mapped;
+  }, [notes, positions]);
 
   // Draw graph
   useEffect(() => {
@@ -52,8 +52,8 @@ export function GraphView() {
     // Draw edges
     notes.forEach((note) => {
       note.linkedNoteIds.forEach((linkedId) => {
-        const from = positions[note.id];
-        const to = positions[linkedId];
+        const from = nodePositions[note.id];
+        const to = nodePositions[linkedId];
         if (!from || !to) return;
         ctx.beginPath();
         ctx.moveTo(from.x, from.y);
@@ -66,7 +66,7 @@ export function GraphView() {
 
     // Draw nodes
     notes.forEach((note) => {
-      const pos = positions[note.id];
+      const pos = nodePositions[note.id];
       if (!pos) return;
 
       const isHovered = hoveredNote === note.id;
@@ -91,13 +91,13 @@ export function GraphView() {
     });
 
     ctx.restore();
-  }, [positions, notes, scale, offset, hoveredNote]);
+  }, [nodePositions, notes, scale, offset, hoveredNote]);
 
   const getNodeAt = (x: number, y: number): string | null => {
     const cx = (x - offset.x) / scale;
     const cy = (y - offset.y) / scale;
     for (const note of notes) {
-      const pos = positions[note.id];
+      const pos = nodePositions[note.id];
       if (!pos) continue;
       const dist = Math.hypot(pos.x - cx, pos.y - cy);
       if (dist < 24) return note.id;

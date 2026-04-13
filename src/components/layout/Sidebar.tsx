@@ -2,12 +2,11 @@
 import React, { useState } from 'react';
 import { useStore } from '@/store/useStore';
 import {
-  BookOpen, Plus, ChevronRight, ChevronDown, Tag, Star, Search,
-  Layers, Brain, Mic, Link2, FileText, Home, Menu, X, Hash,
-  Trash2, Edit3, LayoutTemplate
+  Plus, ChevronRight, ChevronDown, Search,
+  Layers, Brain, Mic, Link2, FileText, Home, Menu, X,
+  Trash2, LayoutTemplate, Files, Cloud
 } from 'lucide-react';
 import { NOTEBOOK_COLORS } from '@/lib/templates';
-import { Notebook, Subject, Topic } from '@/types';
 
 export function Sidebar() {
   const {
@@ -33,7 +32,8 @@ export function Sidebar() {
   const toggleNb = (id: string) => {
     setExpandedNbs((prev) => {
       const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
   };
@@ -41,7 +41,8 @@ export function Sidebar() {
   const toggleSub = (id: string) => {
     setExpandedSubs((prev) => {
       const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
   };
@@ -96,8 +97,10 @@ export function Sidebar() {
             badge={dueCount > 0 ? String(dueCount) : undefined}
           />
           <NavItem icon={<Link2 size={16} />} label="Note Graph" active={activeView === 'graph'} onClick={() => setActiveView('graph')} />
+          <NavItem icon={<Files size={16} />} label="Documents" active={activeView === 'documents'} onClick={() => setActiveView('documents')} />
           <NavItem icon={<Mic size={16} />} label="Audio Notes" active={activeView === 'audio'} onClick={() => setActiveView('audio')} />
           <NavItem icon={<LayoutTemplate size={16} />} label="Templates" active={activeView === 'templates'} onClick={() => setActiveView('templates')} />
+          <NavItem icon={<Cloud size={16} />} label="Sync" active={activeView === 'sync'} onClick={() => setActiveView('sync')} />
         </nav>
 
         {/* Tags */}

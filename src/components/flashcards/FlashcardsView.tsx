@@ -1,13 +1,13 @@
 'use client';
 import React, { useState } from 'react';
 import { useStore } from '@/store/useStore';
-import { Brain, Plus, Trash2, ChevronRight, Clock, CheckCircle, Star, RotateCcw } from 'lucide-react';
+import { Brain, Plus, Trash2, Clock, CheckCircle, RotateCcw } from 'lucide-react';
 import { Flashcard } from '@/types';
 import { formatDate, isDue } from '@/lib/utils';
 import toast from 'react-hot-toast';
 
 export function FlashcardsView() {
-  const { flashcards, addFlashcard, deleteFlashcard, setActiveView, notes } = useStore();
+  const { flashcards, addFlashcard, setActiveView } = useStore();
   const [showForm, setShowForm] = useState(false);
   const [front, setFront] = useState('');
   const [back, setBack] = useState('');

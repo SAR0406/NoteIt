@@ -56,6 +56,17 @@ interface Actions {
   removeTagFromNote: (noteId: string, tag: string) => void;
   linkNotes: (noteId: string, targetId: string) => void;
   unlinkNote: (noteId: string, targetId: string) => void;
+  addAttachmentToNote: (noteId: string, attachment: {
+    name: string;
+    mimeType: string;
+    dataUrl: string;
+    indexedText?: string;
+  }) => void;
+  removeAttachmentFromNote: (noteId: string, attachmentId: string) => void;
+  updateAttachmentAnnotation: (noteId: string, attachmentId: string, annotationLayerDataUrl: string | null) => void;
+  addDrawingToNote: (noteId: string, drawing: { name: string; dataUrl: string; indexedText?: string }) => void;
+  removeDrawingFromNote: (noteId: string, drawingId: string) => void;
+  setHandwritingIndex: (noteId: string, handwritingIndex: string) => void;
 
   // Flashcards
   addFlashcard: (front: string, back: string, noteId?: string | null, tags?: string[]) => Flashcard;
@@ -147,6 +158,9 @@ const initialState: AppState = {
       audioUrl: null,
       audioTimestamps: [],
       templateType: 'anatomy',
+      attachments: [],
+      drawings: [],
+      handwritingIndex: '',
       isFavorite: true,
       isPinned: true,
       createdAt: now,
@@ -165,6 +179,9 @@ const initialState: AppState = {
       audioUrl: null,
       audioTimestamps: [],
       templateType: 'pharmacology',
+      attachments: [],
+      drawings: [],
+      handwritingIndex: '',
       isFavorite: false,
       isPinned: false,
       createdAt: now,
@@ -372,6 +389,9 @@ export const useStore = create<AppState & Actions>()(
           audioUrl: null,
           audioTimestamps: [],
           templateType: templateType ?? null,
+          attachments: [],
+          drawings: [],
+          handwritingIndex: '',
           isFavorite: false,
           isPinned: false,
           createdAt: new Date().toISOString(),
@@ -440,6 +460,94 @@ export const useStore = create<AppState & Actions>()(
             if (n.id === targetId) return { ...n, linkedNoteIds: n.linkedNoteIds.filter((x) => x !== noteId) };
             return n;
           }),
+        })),
+      addAttachmentToNote: (noteId, attachment) =>
+        set((s) => ({
+          notes: s.notes.map((n) =>
+            n.id === noteId
+              ? {
+                  ...n,
+                  attachments: [
+                    ...(n.attachments ?? []),
+                    {
+                      id: generateId(),
+                      name: attachment.name,
+                      mimeType: attachment.mimeType,
+                      dataUrl: attachment.dataUrl,
+                      annotationLayerDataUrl: null,
+                      indexedText: attachment.indexedText ?? '',
+                      createdAt: new Date().toISOString(),
+                    },
+                  ],
+                  updatedAt: new Date().toISOString(),
+                }
+              : n
+          ),
+        })),
+      removeAttachmentFromNote: (noteId, attachmentId) =>
+        set((s) => ({
+          notes: s.notes.map((n) =>
+            n.id === noteId
+              ? {
+                  ...n,
+                  attachments: (n.attachments ?? []).filter((a) => a.id !== attachmentId),
+                  updatedAt: new Date().toISOString(),
+                }
+              : n
+          ),
+        })),
+      updateAttachmentAnnotation: (noteId, attachmentId, annotationLayerDataUrl) =>
+        set((s) => ({
+          notes: s.notes.map((n) =>
+            n.id === noteId
+              ? {
+                  ...n,
+                  attachments: (n.attachments ?? []).map((a) =>
+                    a.id === attachmentId ? { ...a, annotationLayerDataUrl } : a
+                  ),
+                  updatedAt: new Date().toISOString(),
+                }
+              : n
+          ),
+        })),
+      addDrawingToNote: (noteId, drawing) =>
+        set((s) => ({
+          notes: s.notes.map((n) =>
+            n.id === noteId
+              ? {
+                  ...n,
+                  drawings: [
+                    ...(n.drawings ?? []),
+                    {
+                      id: generateId(),
+                      name: drawing.name,
+                      dataUrl: drawing.dataUrl,
+                      indexedText: drawing.indexedText ?? '',
+                      createdAt: new Date().toISOString(),
+                    },
+                  ],
+                  updatedAt: new Date().toISOString(),
+                }
+              : n
+          ),
+        })),
+      removeDrawingFromNote: (noteId, drawingId) =>
+        set((s) => ({
+          notes: s.notes.map((n) =>
+            n.id === noteId
+              ? {
+                  ...n,
+                  drawings: (n.drawings ?? []).filter((d) => d.id !== drawingId),
+                  updatedAt: new Date().toISOString(),
+                }
+              : n
+          ),
+        })),
+      setHandwritingIndex: (noteId, handwritingIndex) =>
+        set((s) => ({
+          notes: s.notes.map((n) =>
+            n.id === noteId ? { ...n, handwritingIndex, updatedAt: new Date().toISOString() } : n
+          ),
         })),
 
       // Flashcards
@@ -512,7 +620,20 @@ export const useStore = create<AppState & Actions>()(
     }),
     {
       name: 'noteit-storage',
-      version: 1,
+      version: 2,
+      migrate: (persisted: unknown) => {
+        const state = persisted as Partial<AppState> | undefined;
+        if (!state || !Array.isArray(state.notes)) return persisted as AppState;
+        return {
+          ...state,
+          notes: state.notes.map((n) => ({
+            ...n,
+            attachments: n.attachments ?? [],
+            drawings: n.drawings ?? [],
+            handwritingIndex: n.handwritingIndex ?? '',
+          })),
+        };
+      },
     }
   )
 );

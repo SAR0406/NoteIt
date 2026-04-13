@@ -1,9 +1,8 @@
 'use client';
 import React, { useState } from 'react';
 import { useStore } from '@/store/useStore';
-import { Brain, X, ChevronRight, CheckCircle } from 'lucide-react';
+import { Brain, X, CheckCircle } from 'lucide-react';
 import { isDue } from '@/lib/utils';
-import toast from 'react-hot-toast';
 
 export function FlashcardReview() {
   const { flashcards, reviewFlashcard, setActiveView } = useStore();
