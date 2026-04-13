@@ -589,10 +589,19 @@ export const useStore = create<AppState & Actions>()(
       generateFlashcardsFromNote: (noteId) => {
         const note = get().notes.find((n) => n.id === noteId);
         if (!note) return;
+        const safeToFlashcardText = (value: string) =>
+          value.replace(/[<>&"']/g, '').replace(/\s+/g, ' ').trim();
+
         // Parse headings and create simple flashcards (AI simulation)
-        const headings = note.content.match(/<h[23][^>]*>([^<]+)<\/h[23]>/g) || [];
-        headings.slice(0, 5).forEach((h) => {
-          const text = h.replace(/<[^>]+>/g, '').trim();
+        const headings = (() => {
+          if (typeof window === 'undefined') return [] as string[];
+          const doc = new window.DOMParser().parseFromString(note.content, 'text/html');
+          return Array.from(doc.querySelectorAll('h2, h3'))
+            .map((node) => safeToFlashcardText(node.textContent ?? ''))
+            .filter(Boolean);
+        })();
+
+        headings.slice(0, 5).forEach((text) => {
           if (text && text.length > 3) {
             get().addFlashcard(
               `What do you know about: ${text}?`,
