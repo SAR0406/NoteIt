@@ -395,12 +395,13 @@ export const useStore = create<AppState & Actions>()(
         })),
       deleteNote: (id) =>
         set((s) => ({
-          notes: s.notes.filter((n) => n.id !== id),
+          notes: s.notes
+            .filter((n) => n.id !== id)
+            .map((n) => ({
+              ...n,
+              linkedNoteIds: n.linkedNoteIds.filter((lid) => lid !== id),
+            })),
           topics: s.topics.map((t) => ({ ...t, noteIds: t.noteIds.filter((nid) => nid !== id) })),
-          notes_linked: s.notes.map((n) => ({
-            ...n,
-            linkedNoteIds: n.linkedNoteIds.filter((lid) => lid !== id),
-          })),
         })),
       toggleFavorite: (id) =>
         set((s) => ({
@@ -499,7 +500,10 @@ export const useStore = create<AppState & Actions>()(
         if (!note) return;
         const textContent = note.content.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
         const sentences = textContent.split('.').filter((s) => s.trim().length > 20).slice(0, 5);
-        const summary = `<h3>📝 AI Summary</h3><ul>${sentences.map((s) => `<li>${s.trim()}.</li>`).join('')}</ul>`;
+        // Escape HTML entities to prevent XSS
+        const escape = (s: string) =>
+          s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        const summary = `<h3>📝 AI Summary</h3><ul>${sentences.map((s) => `<li>${escape(s.trim())}.</li>`).join('')}</ul>`;
         get().updateNote(noteId, { content: note.content + '<hr>' + summary });
       },
       generateQuizFromNote: (noteId) => {
