@@ -4,6 +4,7 @@ import {
   AI_FLASHCARD_FRONT_CHAR_LIMIT,
   AI_SUMMARY_POINT_LIMIT,
 } from './constants';
+import { sanitizeModelText } from './text';
 
 const NVIDIA_NIM_BASE_URL = process.env.NVIDIA_NIM_BASE_URL || 'https://integrate.api.nvidia.com/v1';
 const NVIDIA_NIM_MODEL = process.env.NVIDIA_NIM_MODEL || 'openai/gpt-oss-120b';
@@ -52,9 +53,6 @@ const clip = (value: string, max = AI_CONTEXT_CHAR_LIMIT) => {
   return sliced;
 };
 
-const escapeModelText = (value: string) =>
-  value.replace(/[<>&"']/g, '').replace(/\s+/g, ' ').trim();
-
 const extractJsonObject = (value: string) => {
   const start = value.indexOf('{');
   const end = value.lastIndexOf('}');
@@ -68,13 +66,13 @@ const parseAiOutput = (text: string): NIMResult => {
   try {
     const parsed = JSON.parse(maybeJson) as NIMResult;
     const summaryPoints = Array.isArray(parsed.summaryPoints)
-      ? parsed.summaryPoints.map((point) => escapeModelText(String(point))).filter(Boolean).slice(0, AI_SUMMARY_POINT_LIMIT)
+      ? parsed.summaryPoints.map((point) => sanitizeModelText(String(point))).filter(Boolean).slice(0, AI_SUMMARY_POINT_LIMIT)
       : undefined;
     const flashcards = Array.isArray(parsed.flashcards)
       ? parsed.flashcards
           .map((card) => ({
-            front: escapeModelText(String(card.front ?? '')).slice(0, AI_FLASHCARD_FRONT_CHAR_LIMIT),
-            back: escapeModelText(String(card.back ?? '')).slice(0, AI_FLASHCARD_BACK_CHAR_LIMIT),
+            front: sanitizeModelText(String(card.front ?? '')).slice(0, AI_FLASHCARD_FRONT_CHAR_LIMIT),
+            back: sanitizeModelText(String(card.back ?? '')).slice(0, AI_FLASHCARD_BACK_CHAR_LIMIT),
           }))
           .filter((card) => card.front.length > 3 && card.back.length > 5)
           .slice(0, 10)

@@ -19,6 +19,7 @@ import toast from 'react-hot-toast';
 import { DocumentWorkspace } from '@/components/documents/DocumentWorkspace';
 import { HandwritingPad } from './HandwritingPad';
 import { AI_FLASHCARD_CARD_LIMIT, AI_QUIZ_CARD_LIMIT, AI_SUMMARY_POINT_LIMIT } from '@/lib/ai/constants';
+import { escapeHtml } from '@/lib/ai/text';
 
 export function NoteEditor() {
   const {
@@ -66,14 +67,6 @@ export function NoteEditor() {
       editor.commands.setContent(note.content);
     }
   }, [editor, note]);
-
-  const escapeHtml = (value: string) =>
-    value
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#x27;');
 
   const applyLocalFallback = (action: 'summarize' | 'flashcards' | 'quiz') => {
     if (!note) return;
