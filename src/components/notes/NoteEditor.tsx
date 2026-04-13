@@ -68,7 +68,12 @@ export function NoteEditor() {
   }, [editor, note]);
 
   const escapeHtml = (value: string) =>
-    value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#x27;');
 
   const applyLocalFallback = (action: 'summarize' | 'flashcards' | 'quiz') => {
     if (!note) return;

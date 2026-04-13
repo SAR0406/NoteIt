@@ -44,7 +44,13 @@ const stripHtml = (value: string) => {
   return out.replace(/\s+/g, ' ').trim();
 };
 
-const clip = (value: string, max = AI_CONTEXT_CHAR_LIMIT) => value.slice(0, max);
+const clip = (value: string, max = AI_CONTEXT_CHAR_LIMIT) => {
+  if (value.length <= max) return value;
+  const sliced = value.slice(0, max);
+  const lastSpace = sliced.lastIndexOf(' ');
+  if (lastSpace > max - 120) return sliced.slice(0, lastSpace);
+  return sliced;
+};
 
 const escapeModelText = (value: string) =>
   value.replace(/[<>&"']/g, '').replace(/\s+/g, ' ').trim();
