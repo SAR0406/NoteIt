@@ -6,6 +6,7 @@ const GENERATION_ACTIONS = ['diagram', 'image-convert', '3d'] as const;
 const GENERATION_ACTION_SET = new Set<string>(GENERATION_ACTIONS);
 // 8MB keeps request payloads within practical browser/API limits and avoids oversized base64 uploads.
 const MAX_IMAGE_DATA_URL_LENGTH = 8_000_000;
+const IMAGE_DATA_URL_PATTERN = /^data:image\/[a-zA-Z0-9.+-]+;base64,[A-Za-z0-9+/]+={0,2}$/;
 const VALID_GENERATION_MODELS = [
   'black-forest-labs/flux.1-kontext-dev',
   'black-forest-labs/flux.1-schnell',
@@ -41,7 +42,7 @@ export async function POST(request: NextRequest) {
     if (isGenerationAction && !body.prompt?.trim()) {
       return NextResponse.json({ error: 'Missing generation prompt' }, { status: 400 });
     }
-    if (action === 'image-convert' && !body.image?.startsWith('data:image/')) {
+    if (action === 'image-convert' && (!body.image || !IMAGE_DATA_URL_PATTERN.test(body.image))) {
       return NextResponse.json({ error: 'Missing valid image data URL' }, { status: 400 });
     }
     if (action === 'image-convert' && body.image && body.image.length > MAX_IMAGE_DATA_URL_LENGTH) {

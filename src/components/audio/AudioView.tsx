@@ -65,7 +65,7 @@ export function AudioView() {
     new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '');
-      reader.onerror = () => reject(new Error('Failed to read audio blob'));
+      reader.onerror = () => reject(new Error(`Failed to read audio blob: ${reader.error?.message ?? 'Unknown error'}`));
       reader.readAsDataURL(blob);
     });
 
@@ -112,11 +112,15 @@ export function AudioView() {
       : '';
     if (selectedNoteForAudio) {
       const existingNote = notes.find((n) => n.id === selectedNoteForAudio);
+      if (!existingNote) {
+        toast.error('Selected note no longer exists.');
+        return;
+      }
       updateNote(selectedNoteForAudio, {
         audioUrl,
         audioTimestamps: timestamps,
         type: 'audio',
-        content: transcriptHtml ? `${existingNote?.content ?? ''}<hr>${transcriptHtml}` : existingNote?.content ?? '',
+        content: transcriptHtml ? `${existingNote.content}<hr>${transcriptHtml}` : existingNote.content,
       });
       toast.success('Audio saved to note!');
     } else {

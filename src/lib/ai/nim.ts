@@ -14,7 +14,8 @@ const NVIDIA_NIM_USE_CASE = process.env.NVIDIA_NIM_USE_CASE || 'Retrieval Augmen
 
 type AIAction = 'summarize' | 'flashcards' | 'quiz' | 'diagram' | 'image-convert' | '3d';
 type GenerationModel = 'black-forest-labs/flux.1-kontext-dev' | 'black-forest-labs/flux.1-schnell' | 'microsoft/trellis';
-const GENERATION_ACTIONS: AIAction[] = ['diagram', 'image-convert', '3d'];
+const GENERATION_ACTIONS = ['diagram', 'image-convert', '3d'] as const;
+const GENERATION_ACTION_SET = new Set<AIAction>(GENERATION_ACTIONS);
 // Explicit allowlist keeps request targets fixed to known-safe endpoints.
 const GENERATION_MODEL_ENDPOINTS: Record<GenerationModel, string> = {
   'black-forest-labs/flux.1-kontext-dev': 'black-forest-labs/flux.1-kontext-dev',
@@ -107,7 +108,7 @@ const toSafeHttpUrl = (value: unknown) => {
   if (typeof value !== 'string') return undefined;
   const normalized = value.trim();
   if (!normalized) return undefined;
-  if (normalized.startsWith('https://') || normalized.startsWith('http://')) return normalized;
+  if (normalized.startsWith('https://')) return normalized;
   return undefined;
 };
 
@@ -185,7 +186,7 @@ const callGenerationModel = async (
     };
   } else if (payload.action === 'image-convert') {
     if (!payload.image?.startsWith('data:image/')) {
-      throw new Error('A valid image data URL is required for image conversion');
+      throw new Error('Image must be a data URL with format: data:image/{type};base64,{data}');
     }
     body = {
       prompt,
@@ -238,7 +239,7 @@ export async function generateWithNIM(payload: NIMRequestPayload): Promise<NIMRe
     throw new Error('NVIDIA_API_KEY is not configured');
   }
 
-  if (GENERATION_ACTIONS.includes(payload.action)) {
+  if (GENERATION_ACTION_SET.has(payload.action)) {
     const generated = await callGenerationModel(payload, apiKey);
     return { generated };
   }
