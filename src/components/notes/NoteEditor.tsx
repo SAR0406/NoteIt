@@ -22,7 +22,7 @@ import { AI_FLASHCARD_CARD_LIMIT, AI_QUIZ_CARD_LIMIT, AI_SUMMARY_POINT_LIMIT } f
 import { escapeHtml } from '@/lib/ai/text';
 
 type AIAction = 'summarize' | 'flashcards' | 'quiz' | 'diagram' | 'image-convert' | '3d';
-type GenerationModel = 'black-forest-labs/flux.1-kontext-dev' | 'microsoft/trellis';
+type GenerationModel = 'black-forest-labs/flux.1-kontext-dev' | 'black-forest-labs/flux.1-schnell' | 'microsoft/trellis';
 
 export function NoteEditor() {
   const {
@@ -106,11 +106,11 @@ export function NoteEditor() {
       prompt = input.trim();
     }
     if (action === 'image-convert') {
-      const stylePrompt = window.prompt('Describe the target style (example: anime, ghibli, sketch)', 'Transform into ghibli style medical diagram');
+      const stylePrompt = window.prompt('Describe the target style (example: anime, Ghibli, sketch)', 'Transform into Ghibli style medical diagram');
       if (!stylePrompt?.trim()) return;
       const sourceImage = window.prompt('Paste source image as data URL (data:image/...)');
       if (!sourceImage?.startsWith('data:image/')) {
-        toast.error('Image conversion needs a valid data:image URL.');
+        toast.error('Please provide a valid data URL starting with data:image/ for image conversion.');
         return;
       }
       prompt = stylePrompt.trim();
@@ -180,7 +180,12 @@ export function NoteEditor() {
         if (!safePreview && !safeAsset) {
           toast.error('Generation completed but no preview URL was returned.');
         } else {
-          const title = action === '3d' ? '🧊 AI 3D Generation' : action === 'diagram' ? '🖼️ AI Diagram/Photo Generation' : '🎨 AI Image Conversion';
+          const titleByAction: Record<'diagram' | 'image-convert' | '3d', string> = {
+            diagram: '🖼️ AI Diagram/Photo Generation',
+            'image-convert': '🎨 AI Image Conversion',
+            '3d': '🧊 AI 3D Generation',
+          };
+          const title = titleByAction[action];
           const resultHtml = [
             `<h3>${title}</h3>`,
             `<p><strong>Model:</strong> ${escapeHtml(data.generated?.model ?? model)}</p>`,
@@ -395,6 +400,7 @@ export function NoteEditor() {
                   onChange={(e) => setImageModel(e.target.value as GenerationModel)}
                 >
                   <option value="black-forest-labs/flux.1-kontext-dev">FLUX.1-Kontext-dev</option>
+                  <option value="black-forest-labs/flux.1-schnell">FLUX.1-schnell (fast preview)</option>
                 </select>
                 <button onClick={() => handleAI('summarize')} className="w-full text-left text-xs px-3 py-2 hover:bg-gray-100 rounded-lg flex items-center gap-2">
                   <AlignLeft size={12} /> Summarize note
@@ -409,7 +415,7 @@ export function NoteEditor() {
                   <Sparkles size={12} /> Generate diagram/photo
                 </button>
                 <button onClick={() => handleAI('image-convert')} className="w-full text-left text-xs px-3 py-2 hover:bg-gray-100 rounded-lg flex items-center gap-2">
-                  <Sparkles size={12} /> Convert photo style (anime/ghibli)
+                  <Sparkles size={12} /> Convert photo style (anime/Ghibli)
                 </button>
                 <button onClick={() => handleAI('3d')} className="w-full text-left text-xs px-3 py-2 hover:bg-gray-100 rounded-lg flex items-center gap-2">
                   <Sparkles size={12} /> Generate 3D model (Trellis)

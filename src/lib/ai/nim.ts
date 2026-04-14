@@ -7,12 +7,20 @@ import {
 import { sanitizeModelText } from './text';
 
 const NVIDIA_NIM_BASE_URL = process.env.NVIDIA_NIM_BASE_URL || 'https://integrate.api.nvidia.com/v1';
+// Text/chat APIs and GenAI model endpoints are hosted on different NVIDIA domains.
 const NVIDIA_NIM_GENAI_BASE_URL = process.env.NVIDIA_NIM_GENAI_BASE_URL || 'https://ai.api.nvidia.com/v1/genai';
 const NVIDIA_NIM_MODEL = process.env.NVIDIA_NIM_MODEL || 'openai/gpt-oss-120b';
 const NVIDIA_NIM_USE_CASE = process.env.NVIDIA_NIM_USE_CASE || 'Retrieval Augmented Generation';
 
 type AIAction = 'summarize' | 'flashcards' | 'quiz' | 'diagram' | 'image-convert' | '3d';
-type GenerationModel = 'black-forest-labs/flux.1-kontext-dev' | 'microsoft/trellis';
+type GenerationModel = 'black-forest-labs/flux.1-kontext-dev' | 'black-forest-labs/flux.1-schnell' | 'microsoft/trellis';
+const GENERATION_ACTIONS: AIAction[] = ['diagram', 'image-convert', '3d'];
+// Explicit allowlist keeps request targets fixed to known-safe endpoints.
+const GENERATION_MODEL_ENDPOINTS: Record<GenerationModel, string> = {
+  'black-forest-labs/flux.1-kontext-dev': 'black-forest-labs/flux.1-kontext-dev',
+  'black-forest-labs/flux.1-schnell': 'black-forest-labs/flux.1-schnell',
+  'microsoft/trellis': 'microsoft/trellis',
+};
 
 export interface NIMRequestPayload {
   action: AIAction;
@@ -148,7 +156,12 @@ const extractAssetUrl = (raw: unknown) => {
 
 const resolveGenerationModel = (payload: NIMRequestPayload): GenerationModel => {
   if (payload.action === '3d') return 'microsoft/trellis';
-  return payload.model ?? 'black-forest-labs/flux.1-kontext-dev';
+  const requestedModel = payload.model;
+  // Trellis is dedicated to 3D generation, so diagram/photo flows only allow FLUX models.
+  if (requestedModel && requestedModel in GENERATION_MODEL_ENDPOINTS && requestedModel !== 'microsoft/trellis') {
+    return requestedModel;
+  }
+  return 'black-forest-labs/flux.1-kontext-dev';
 };
 
 const callGenerationModel = async (
@@ -161,6 +174,7 @@ const callGenerationModel = async (
 
   let body: Record<string, unknown>;
   if (payload.action === '3d') {
+    // Trellis controls two-stage structured latent + shape sampling quality/speed tradeoff.
     body = {
       prompt,
       slat_cfg_scale: 3,
@@ -191,7 +205,9 @@ const callGenerationModel = async (
     };
   }
 
-  const response = await fetch(`${NVIDIA_NIM_GENAI_BASE_URL}/${model}`, {
+  const endpoint = GENERATION_MODEL_ENDPOINTS[model];
+
+  const response = await fetch(`${NVIDIA_NIM_GENAI_BASE_URL}/${endpoint}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -222,7 +238,7 @@ export async function generateWithNIM(payload: NIMRequestPayload): Promise<NIMRe
     throw new Error('NVIDIA_API_KEY is not configured');
   }
 
-  if (payload.action === 'diagram' || payload.action === 'image-convert' || payload.action === '3d') {
+  if (GENERATION_ACTIONS.includes(payload.action)) {
     const generated = await callGenerationModel(payload, apiKey);
     return { generated };
   }

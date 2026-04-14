@@ -1,11 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateWithNIM } from '@/lib/ai/nim';
 
+const VALID_ACTIONS = ['summarize', 'flashcards', 'quiz', 'diagram', 'image-convert', '3d'] as const;
+const GENERATION_ACTIONS = ['diagram', 'image-convert', '3d'] as const;
+const GENERATION_ACTION_SET = new Set<string>(GENERATION_ACTIONS);
+// 8MB keeps request payloads within practical browser/API limits and avoids oversized base64 uploads.
+const MAX_IMAGE_DATA_URL_LENGTH = 8_000_000;
+const VALID_GENERATION_MODELS = [
+  'black-forest-labs/flux.1-kontext-dev',
+  'black-forest-labs/flux.1-schnell',
+  'microsoft/trellis',
+] as const;
+
 export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as {
       action?: 'summarize' | 'flashcards' | 'quiz' | 'diagram' | 'image-convert' | '3d';
-      model?: 'black-forest-labs/flux.1-kontext-dev' | 'microsoft/trellis';
+      model?: 'black-forest-labs/flux.1-kontext-dev' | 'black-forest-labs/flux.1-schnell' | 'microsoft/trellis';
       prompt?: string;
       image?: string;
       note?: {
@@ -19,16 +30,22 @@ export async function POST(request: NextRequest) {
     };
 
     const action = body.action;
-    if (!action || !['summarize', 'flashcards', 'quiz', 'diagram', 'image-convert', '3d'].includes(action)) {
+    if (!action || !VALID_ACTIONS.includes(action)) {
       return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
     }
+    if (body.model && !VALID_GENERATION_MODELS.includes(body.model)) {
+      return NextResponse.json({ error: 'Invalid model' }, { status: 400 });
+    }
 
-    const isGenerationAction = action === 'diagram' || action === 'image-convert' || action === '3d';
+    const isGenerationAction = GENERATION_ACTION_SET.has(action);
     if (isGenerationAction && !body.prompt?.trim()) {
       return NextResponse.json({ error: 'Missing generation prompt' }, { status: 400 });
     }
     if (action === 'image-convert' && !body.image?.startsWith('data:image/')) {
       return NextResponse.json({ error: 'Missing valid image data URL' }, { status: 400 });
+    }
+    if (action === 'image-convert' && body.image && body.image.length > MAX_IMAGE_DATA_URL_LENGTH) {
+      return NextResponse.json({ error: 'Image data URL is too large' }, { status: 400 });
     }
 
     const note = body.note;
