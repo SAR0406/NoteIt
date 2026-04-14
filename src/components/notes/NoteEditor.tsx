@@ -22,7 +22,7 @@ import { AI_FLASHCARD_CARD_LIMIT, AI_QUIZ_CARD_LIMIT, AI_SUMMARY_POINT_LIMIT } f
 import { escapeHtml } from '@/lib/ai/text';
 
 type AIAction = 'summarize' | 'flashcards' | 'quiz' | 'diagram' | 'image-convert' | '3d';
-type GenerationModel = 'black-forest-labs/flux.1-kontext-dev' | 'black-forest-labs/flux.1-schnell' | 'microsoft/trellis';
+type GenerationModel = 'black-forest-labs/flux.2-klein-4b' | 'microsoft/trellis';
 
 export function NoteEditor() {
   const {
@@ -41,7 +41,6 @@ export function NoteEditor() {
   const [editingTitle, setEditingTitle] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
   const [splitMode, setSplitMode] = useState(false);
-  const [imageModel, setImageModel] = useState<GenerationModel>('black-forest-labs/flux.1-kontext-dev');
 
   const editor = useEditor(
     {
@@ -93,10 +92,13 @@ export function NoteEditor() {
     if (!note) return;
     let prompt = '';
     let image = '';
-    const model: GenerationModel = action === '3d' ? 'microsoft/trellis' : imageModel;
+    const model: GenerationModel = action === '3d' ? 'microsoft/trellis' : 'black-forest-labs/flux.2-klein-4b';
 
     if (action === 'diagram') {
-      const input = window.prompt('Describe the diagram/photo to generate', `Create a medical diagram for "${note.title}"`);
+      const input = window.prompt(
+        'What should be generated? (example: human heart, human kidney, human brain)',
+        note.title || 'human heart'
+      );
       if (!input?.trim()) return;
       prompt = input.trim();
     }
@@ -106,14 +108,17 @@ export function NoteEditor() {
       prompt = input.trim();
     }
     if (action === 'image-convert') {
-      const stylePrompt = window.prompt('Describe the target style (example: anime, Ghibli, sketch)', 'Transform into Ghibli style medical diagram');
-      if (!stylePrompt?.trim()) return;
+      const subjectPrompt = window.prompt(
+        'Describe the anatomy in the source image for clean study-style editing',
+        note.title || 'human heart'
+      );
+      if (!subjectPrompt?.trim()) return;
       const sourceImage = window.prompt('Paste source image as data URL (data:image/...)');
       if (!sourceImage?.startsWith('data:image/')) {
         toast.error('Please provide a valid data URL starting with data:image/ for image conversion.');
         return;
       }
-      prompt = stylePrompt.trim();
+      prompt = subjectPrompt.trim();
       image = sourceImage.trim();
     }
 
@@ -393,15 +398,7 @@ export function NoteEditor() {
             </button>
             {showAiDropdown && (
               <div className="absolute right-0 top-full mt-1 w-64 bg-white border border-gray-200 rounded-xl shadow-lg z-50 p-2">
-                <p className="text-[11px] text-gray-500 px-1 mb-1">Image/diagram model</p>
-                <select
-                  className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 mb-2"
-                  value={imageModel}
-                  onChange={(e) => setImageModel(e.target.value as GenerationModel)}
-                >
-                  <option value="black-forest-labs/flux.1-kontext-dev">FLUX.1-Kontext-dev</option>
-                  <option value="black-forest-labs/flux.1-schnell">FLUX.1-schnell (fast preview)</option>
-                </select>
+                <p className="text-[11px] text-gray-500 px-1 mb-2">Photo generation/editing model: FLUX.2-Klein-4B</p>
                 <button onClick={() => handleAI('summarize')} className="w-full text-left text-xs px-3 py-2 hover:bg-gray-100 rounded-lg flex items-center gap-2">
                   <AlignLeft size={12} /> Summarize note
                 </button>

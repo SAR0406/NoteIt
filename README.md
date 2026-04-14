@@ -46,7 +46,7 @@ With one `NVIDIA_API_KEY`, NoteIt can call:
 
 - Text AI (summaries/flashcards/quiz): `chat/completions`
 - Speech-to-text / optional English translation: `audio/transcriptions` and `audio/translations`
-- Diagram/photo generation and style conversion: `black-forest-labs/flux.1-kontext-dev`
+- Diagram/photo generation and style conversion: `black-forest-labs/flux.2-klein-4b`
 - 3D generation: `microsoft/trellis`
 
 ## 🧰 Tech Stack

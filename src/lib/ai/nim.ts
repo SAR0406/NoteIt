@@ -13,13 +13,12 @@ const NVIDIA_NIM_MODEL = process.env.NVIDIA_NIM_MODEL || 'openai/gpt-oss-120b';
 const NVIDIA_NIM_USE_CASE = process.env.NVIDIA_NIM_USE_CASE || 'Retrieval Augmented Generation';
 
 type AIAction = 'summarize' | 'flashcards' | 'quiz' | 'diagram' | 'image-convert' | '3d';
-type GenerationModel = 'black-forest-labs/flux.1-kontext-dev' | 'black-forest-labs/flux.1-schnell' | 'microsoft/trellis';
+type GenerationModel = 'black-forest-labs/flux.2-klein-4b' | 'microsoft/trellis';
 const GENERATION_ACTIONS = ['diagram', 'image-convert', '3d'] as const;
 const GENERATION_ACTION_SET = new Set<AIAction>(GENERATION_ACTIONS);
 // Explicit allowlist keeps request targets fixed to known-safe endpoints.
 const GENERATION_MODEL_ENDPOINTS: Record<GenerationModel, string> = {
-  'black-forest-labs/flux.1-kontext-dev': 'black-forest-labs/flux.1-kontext-dev',
-  'black-forest-labs/flux.1-schnell': 'black-forest-labs/flux.1-schnell',
+  'black-forest-labs/flux.2-klein-4b': 'black-forest-labs/flux.2-klein-4b',
   'microsoft/trellis': 'microsoft/trellis',
 };
 
@@ -120,6 +119,13 @@ const toSafeDataImage = (value: unknown) => {
   return undefined;
 };
 
+const toDataImageFromBase64 = (value: unknown) => {
+  if (typeof value !== 'string') return undefined;
+  const normalized = value.trim();
+  if (!normalized || !/^[A-Za-z0-9+/]+={0,2}$/.test(normalized)) return undefined;
+  return `data:image/png;base64,${normalized}`;
+};
+
 const readNestedString = (value: unknown, keys: string[]) => {
   if (!value || typeof value !== 'object') return undefined;
   let cursor: unknown = value;
@@ -135,8 +141,14 @@ const extractPreviewImage = (raw: unknown) => {
   const direct = toSafeDataImage(readNestedString(raw, ['image'])) ?? toSafeHttpUrl(readNestedString(raw, ['image']));
   if (direct) return direct;
 
-  const firstImages = readNestedString(raw, ['images', '0']) ?? readNestedString(raw, ['output', '0', 'url']);
+  const firstImages =
+    readNestedString(raw, ['images', '0']) ??
+    readNestedString(raw, ['output', '0', 'url']) ??
+    readNestedString(raw, ['data', '0', 'url']);
   if (firstImages) return toSafeDataImage(firstImages) ?? toSafeHttpUrl(firstImages);
+
+  const encodedImage = readNestedString(raw, ['b64_json']) ?? readNestedString(raw, ['data', '0', 'b64_json']);
+  if (encodedImage) return toDataImageFromBase64(encodedImage);
 
   const artifactUrl = readNestedString(raw, ['artifacts', '0', 'url']);
   if (artifactUrl) return toSafeHttpUrl(artifactUrl);
@@ -157,12 +169,23 @@ const extractAssetUrl = (raw: unknown) => {
 
 const resolveGenerationModel = (payload: NIMRequestPayload): GenerationModel => {
   if (payload.action === '3d') return 'microsoft/trellis';
-  const requestedModel = payload.model;
-  // Trellis is dedicated to 3D generation, so diagram/photo flows only allow FLUX models.
-  if (requestedModel && requestedModel in GENERATION_MODEL_ENDPOINTS && requestedModel !== 'microsoft/trellis') {
-    return requestedModel;
-  }
-  return 'black-forest-labs/flux.1-kontext-dev';
+  // Use a single fixed FLUX model for all photo/diagram generation and image editing flows.
+  return 'black-forest-labs/flux.2-klein-4b';
+};
+
+const buildMedicalStudyImagePrompt = (subject: string, action: Extract<AIAction, 'diagram' | 'image-convert'>) => {
+  const cleanedSubject = sanitizeModelText(subject).slice(0, 240) || 'human anatomy structure';
+  const modeInstruction =
+    action === 'image-convert'
+      ? 'Use the uploaded source image as reference and preserve the same core anatomical structure while improving clarity for study.'
+      : 'Generate a new image from scratch.';
+  return [
+    `Create a real-life, detailed, anatomically accurate ${cleanedSubject} of a human body, in clean diagram-style animated illustration.`,
+    modeInstruction,
+    'Subject only, centered and clear.',
+    'No text, no labels, no legend, no watermark, no arrows, no annotations.',
+    'This image must be suitable to stick in notes for study and label practice.',
+  ].join(' ');
 };
 
 const callGenerationModel = async (
@@ -188,20 +211,22 @@ const callGenerationModel = async (
     if (!payload.image?.startsWith('data:image/')) {
       throw new Error('Image must be a data URL with format: data:image/{type};base64,{data}');
     }
+    const studyPrompt = buildMedicalStudyImagePrompt(prompt, 'image-convert');
     body = {
-      prompt,
+      prompt: studyPrompt,
       image: payload.image,
-      aspect_ratio: 'match_input_image',
-      steps: 30,
-      cfg_scale: 3.5,
+      width: 1024,
+      height: 1024,
+      steps: 4,
       seed: 0,
     };
   } else {
+    const studyPrompt = buildMedicalStudyImagePrompt(prompt, 'diagram');
     body = {
-      prompt,
-      aspect_ratio: '16:9',
-      steps: 30,
-      cfg_scale: 3.5,
+      prompt: studyPrompt,
+      width: 1024,
+      height: 1024,
+      steps: 4,
       seed: 0,
     };
   }
