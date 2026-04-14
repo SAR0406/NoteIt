@@ -12,7 +12,7 @@ A comprehensive note-taking web application designed specifically for MBBS/medic
 | 🧠 **Flashcards + SM-2** | Spaced repetition with Again/Hard/Good/Easy review |
 | 🔗 **Note Linking** | Obsidian-style bi-directional note links |
 | 🕸️ **Graph View** | Visual canvas showing note connections |
-| 🎧 **Audio Recording** | Record lectures with timestamped annotations |
+| 🎧 **Audio Recording + STT** | Record lectures, transcribe speech, and optionally translate transcripts to English |
 | 🎨 **Medical Templates** | SOAP Note, Case Sheet, Anatomy, Pharmacology |
 | 🤖 **AI Tools (NVIDIA NIM)** | AI summarize/quiz/flashcards + FLUX diagram/photo generation + Trellis 3D generation |
 | 🔍 **Full-text Search** | Search by title, content, or tags |
@@ -38,12 +38,14 @@ Configure:
 
 - `NVIDIA_API_KEY`: your NIM API key
 - `NVIDIA_NIM_MODEL`: default `openai/gpt-oss-120b`
+- `NVIDIA_NIM_ASR_MODEL`: default `openai/whisper-large-v3`
 - `NVIDIA_NIM_GENAI_BASE_URL`: default `https://ai.api.nvidia.com/v1/genai`
 - `NVIDIA_NIM_USE_CASE`: default `Retrieval Augmented Generation` (best fit for MBBS note + OCR context)
 
 With one `NVIDIA_API_KEY`, NoteIt can call:
 
 - Text AI (summaries/flashcards/quiz): `chat/completions`
+- Speech-to-text / optional English translation: `audio/transcriptions` and `audio/translations`
 - Diagram/photo generation and style conversion: `black-forest-labs/flux.1-kontext-dev`
 - 3D generation: `microsoft/trellis`
 

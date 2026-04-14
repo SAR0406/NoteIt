@@ -4,14 +4,20 @@ import { useStore } from '@/store/useStore';
 import { Mic, Square, Clock, Plus } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
 import toast from 'react-hot-toast';
+import { escapeHtml } from '@/lib/ai/text';
 
 export function AudioView() {
   const { notes, updateNote, addNote, selectNote, setActiveView, selectedNotebookId, selectedSubjectId, selectedTopicId } = useStore();
 
   const [recording, setRecording] = useState(false);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [timestamps, setTimestamps] = useState<{ time: number; text: string }[]>([]);
   const [newTimestampText, setNewTimestampText] = useState('');
+  const [languageCode, setLanguageCode] = useState('en');
+  const [translateToEnglish, setTranslateToEnglish] = useState(false);
+  const [transcript, setTranscript] = useState('');
+  const [asrLoading, setAsrLoading] = useState(false);
   const [selectedNoteForAudio, setSelectedNoteForAudio] = useState<string | null>(null);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -27,6 +33,7 @@ export function AudioView() {
       mr.onstop = () => {
         const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
         const url = URL.createObjectURL(blob);
+        setAudioBlob(blob);
         setAudioUrl(url);
         stream.getTracks().forEach((t) => t.stop());
       };
@@ -34,6 +41,7 @@ export function AudioView() {
       mediaRecorderRef.current = mr;
       setRecording(true);
       setTimestamps([]);
+      setTranscript('');
       toast.success('Recording started');
     } catch {
       toast.error('Microphone access denied');
@@ -53,13 +61,62 @@ export function AudioView() {
     }
   };
 
+  const blobToDataUrl = (blob: Blob) =>
+    new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '');
+      reader.onerror = () => reject(new Error('Failed to read audio blob'));
+      reader.readAsDataURL(blob);
+    });
+
+  const transcribeAudio = async () => {
+    if (!audioBlob) {
+      toast.error('Record audio first.');
+      return;
+    }
+    setAsrLoading(true);
+    try {
+      const audioDataUrl = await blobToDataUrl(audioBlob);
+      const response = await fetch('/api/asr', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          audioDataUrl,
+          languageCode,
+          translateToEnglish,
+        }),
+      });
+
+      if (!response.ok) {
+        const err = (await response.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(err?.error || 'Transcription failed');
+      }
+
+      const data = (await response.json()) as { text?: string };
+      const text = (data.text ?? '').trim();
+      if (!text) throw new Error('No text returned from ASR');
+      setTranscript(text);
+      toast.success(translateToEnglish ? 'Translated to English' : 'Transcription complete');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Transcription failed';
+      toast.error(message);
+    } finally {
+      setAsrLoading(false);
+    }
+  };
+
   const saveAudioToNote = () => {
     if (!audioUrl) return;
+    const transcriptHtml = transcript
+      ? `<h3>🎙️ Audio Transcript${translateToEnglish ? ' (English)' : ''}</h3><p>${escapeHtml(transcript).replace(/\n/g, '<br />')}</p>`
+      : '';
     if (selectedNoteForAudio) {
+      const existingNote = notes.find((n) => n.id === selectedNoteForAudio);
       updateNote(selectedNoteForAudio, {
         audioUrl,
         audioTimestamps: timestamps,
         type: 'audio',
+        content: transcriptHtml ? `${existingNote?.content ?? ''}<hr>${transcriptHtml}` : existingNote?.content ?? '',
       });
       toast.success('Audio saved to note!');
     } else {
@@ -70,7 +127,12 @@ export function AudioView() {
         title: `Audio Note — ${new Date().toLocaleTimeString()}`,
         templateType: 'blank',
       });
-      updateNote(note.id, { audioUrl, audioTimestamps: timestamps, type: 'audio' });
+      updateNote(note.id, {
+        audioUrl,
+        audioTimestamps: timestamps,
+        type: 'audio',
+        content: transcriptHtml ? `${note.content}<hr>${transcriptHtml}` : note.content,
+      });
       toast.success('New audio note created!');
     }
   };
@@ -125,6 +187,39 @@ export function AudioView() {
                 controls
                 className="w-full mb-3"
               />
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mb-3">
+                <input
+                  className="border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-400"
+                  placeholder="Language code (en, hi, multi...)"
+                  value={languageCode}
+                  onChange={(e) => setLanguageCode(e.target.value)}
+                />
+                <label className="flex items-center gap-2 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={translateToEnglish}
+                    onChange={(e) => setTranslateToEnglish(e.target.checked)}
+                  />
+                  Translate to English
+                </label>
+                <button
+                  onClick={transcribeAudio}
+                  disabled={asrLoading}
+                  className="px-3 py-2 bg-indigo-600 text-white rounded-lg text-sm hover:bg-indigo-700 disabled:opacity-60"
+                >
+                  {asrLoading ? 'Transcribing...' : 'Transcribe Audio'}
+                </button>
+              </div>
+
+              {transcript && (
+                <div className="mb-3 border border-indigo-100 bg-indigo-50 rounded-lg p-3">
+                  <p className="text-xs font-semibold text-indigo-700 mb-1">
+                    Transcript{translateToEnglish ? ' (English)' : ''}
+                  </p>
+                  <p className="text-sm text-gray-800 whitespace-pre-wrap">{transcript}</p>
+                </div>
+              )}
 
               {/* Timestamp annotation */}
               <div className="flex gap-2 mb-3">
