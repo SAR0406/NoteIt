@@ -135,6 +135,10 @@ const toDataImageFromBase64 = (value: unknown) => {
   return `data:image/png;base64,${normalized}`;
 };
 
+const toSafePreviewImage = (value: unknown) => {
+  return toSafeDataImage(value) ?? toSafeHttpUrl(value) ?? toDataImageFromBase64(value);
+};
+
 const readNestedString = (value: unknown, keys: string[]) => {
   if (!value || typeof value !== 'object') return undefined;
   let cursor: unknown = value;
@@ -147,20 +151,31 @@ const readNestedString = (value: unknown, keys: string[]) => {
 
 const extractPreviewImage = (raw: unknown) => {
   if (!raw || typeof raw !== 'object') return undefined;
-  const direct = toSafeDataImage(readNestedString(raw, ['image'])) ?? toSafeHttpUrl(readNestedString(raw, ['image']));
-  if (direct) return direct;
 
-  const firstImages =
-    readNestedString(raw, ['images', '0']) ??
-    readNestedString(raw, ['output', '0', 'url']) ??
-    readNestedString(raw, ['data', '0', 'url']);
-  if (firstImages) return toSafeDataImage(firstImages) ?? toSafeHttpUrl(firstImages);
-
-  const encodedImage = readNestedString(raw, ['b64_json']) ?? readNestedString(raw, ['data', '0', 'b64_json']);
-  if (encodedImage) return toDataImageFromBase64(encodedImage);
-
-  const artifactUrl = readNestedString(raw, ['artifacts', '0', 'url']);
-  if (artifactUrl) return toSafeHttpUrl(artifactUrl);
+  const candidates = [
+    readNestedString(raw, ['image']),
+    readNestedString(raw, ['output_image']),
+    readNestedString(raw, ['preview_image']),
+    readNestedString(raw, ['images', '0']),
+    readNestedString(raw, ['images', '0', 'url']),
+    readNestedString(raw, ['images', '0', 'image']),
+    readNestedString(raw, ['images', '0', 'b64_json']),
+    readNestedString(raw, ['images', '0', 'base64']),
+    readNestedString(raw, ['output', '0', 'url']),
+    readNestedString(raw, ['output', '0', 'image']),
+    readNestedString(raw, ['output', '0', 'b64_json']),
+    readNestedString(raw, ['data', '0', 'url']),
+    readNestedString(raw, ['data', '0', 'image']),
+    readNestedString(raw, ['data', '0', 'b64_json']),
+    readNestedString(raw, ['b64_json']),
+    readNestedString(raw, ['artifacts', '0', 'url']),
+    readNestedString(raw, ['artifacts', '0', 'b64_json']),
+    readNestedString(raw, ['artifacts', '0', 'base64']),
+  ];
+  for (const candidate of candidates) {
+    const preview = toSafePreviewImage(candidate);
+    if (preview) return preview;
+  }
 
   return undefined;
 };
@@ -169,10 +184,12 @@ const extractAssetUrl = (raw: unknown) => {
   if (!raw || typeof raw !== 'object') return undefined;
   return (
     toSafeHttpUrl(readNestedString(raw, ['asset_url'])) ??
+    toSafeHttpUrl(readNestedString(raw, ['assetUrl'])) ??
     toSafeHttpUrl(readNestedString(raw, ['model_url'])) ??
     toSafeHttpUrl(readNestedString(raw, ['mesh_url'])) ??
     toSafeHttpUrl(readNestedString(raw, ['url'])) ??
-    toSafeHttpUrl(readNestedString(raw, ['artifacts', '0', 'url']))
+    toSafeHttpUrl(readNestedString(raw, ['artifacts', '0', 'url'])) ??
+    toSafeHttpUrl(readNestedString(raw, ['artifacts', '0', 'asset_url']))
   );
 };
 
