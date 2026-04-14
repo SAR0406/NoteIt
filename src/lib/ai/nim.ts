@@ -122,7 +122,16 @@ const toSafeDataImage = (value: unknown) => {
 const toDataImageFromBase64 = (value: unknown) => {
   if (typeof value !== 'string') return undefined;
   const normalized = value.trim();
-  if (!normalized || !/^[A-Za-z0-9+/]+={0,2}$/.test(normalized)) return undefined;
+  if (!normalized) return undefined;
+  try {
+    const decoded = Buffer.from(normalized, 'base64');
+    if (decoded.length === 0) return undefined;
+    const reEncoded = decoded.toString('base64').replace(/=+$/g, '');
+    const normalizedNoPadding = normalized.replace(/=+$/g, '');
+    if (reEncoded !== normalizedNoPadding) return undefined;
+  } catch {
+    return undefined;
+  }
   return `data:image/png;base64,${normalized}`;
 };
 
@@ -174,13 +183,14 @@ const resolveGenerationModel = (payload: NIMRequestPayload): GenerationModel => 
 };
 
 const buildMedicalStudyImagePrompt = (subject: string, action: Extract<AIAction, 'diagram' | 'image-convert'>) => {
+  // Keep subject concise to reduce prompt dilution and improve instruction adherence.
   const cleanedSubject = sanitizeModelText(subject).slice(0, 240) || 'human anatomy structure';
   const modeInstruction =
     action === 'image-convert'
       ? 'Use the uploaded source image as reference and preserve the same core anatomical structure while improving clarity for study.'
       : 'Generate a new image from scratch.';
   return [
-    `Create a real-life, detailed, anatomically accurate ${cleanedSubject} of a human body, in clean diagram-style animated illustration.`,
+    `Create a detailed, anatomically accurate educational illustration of ${cleanedSubject} in clean diagram style.`,
     modeInstruction,
     'Subject only, centered and clear.',
     'No text, no labels, no legend, no watermark, no arrows, no annotations.',
@@ -215,8 +225,7 @@ const callGenerationModel = async (
     body = {
       prompt: studyPrompt,
       image: payload.image,
-      width: 1024,
-      height: 1024,
+      aspect_ratio: 'match_input_image',
       steps: 4,
       seed: 0,
     };
