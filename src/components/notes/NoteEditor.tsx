@@ -21,6 +21,9 @@ import { HandwritingPad } from './HandwritingPad';
 import { AI_FLASHCARD_CARD_LIMIT, AI_QUIZ_CARD_LIMIT, AI_SUMMARY_POINT_LIMIT } from '@/lib/ai/constants';
 import { escapeHtml } from '@/lib/ai/text';
 
+type AIAction = 'summarize' | 'flashcards' | 'quiz' | 'diagram' | 'image-convert' | '3d';
+type GenerationModel = 'black-forest-labs/flux.1-kontext-dev' | 'microsoft/trellis';
+
 export function NoteEditor() {
   const {
     notes, selectedNoteId, updateNote, deleteNote, toggleFavorite, togglePin,
@@ -33,10 +36,12 @@ export function NoteEditor() {
 
   const [showTagDropdown, setShowTagDropdown] = useState(false);
   const [showLinkDropdown, setShowLinkDropdown] = useState(false);
+  const [showAiDropdown, setShowAiDropdown] = useState(false);
   const [customTag, setCustomTag] = useState('');
   const [editingTitle, setEditingTitle] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
   const [splitMode, setSplitMode] = useState(false);
+  const [imageModel, setImageModel] = useState<GenerationModel>('black-forest-labs/flux.1-kontext-dev');
 
   const editor = useEditor(
     {
@@ -75,8 +80,43 @@ export function NoteEditor() {
     else generateQuizFromNote(note.id);
   };
 
-  const handleAI = async (action: 'summarize' | 'flashcards' | 'quiz') => {
+  const toSafeUrl = (value?: string) => {
+    if (!value) return '';
+    const normalized = value.trim();
+    if (normalized.startsWith('https://') || normalized.startsWith('http://') || normalized.startsWith('data:image/')) {
+      return normalized;
+    }
+    return '';
+  };
+
+  const handleAI = async (action: AIAction) => {
     if (!note) return;
+    let prompt = '';
+    let image = '';
+    const model: GenerationModel = action === '3d' ? 'microsoft/trellis' : imageModel;
+
+    if (action === 'diagram') {
+      const input = window.prompt('Describe the diagram/photo to generate', `Create a medical diagram for "${note.title}"`);
+      if (!input?.trim()) return;
+      prompt = input.trim();
+    }
+    if (action === '3d') {
+      const input = window.prompt('Describe the 3D model to generate', `Generate a detailed 3D model for "${note.title}"`);
+      if (!input?.trim()) return;
+      prompt = input.trim();
+    }
+    if (action === 'image-convert') {
+      const stylePrompt = window.prompt('Describe the target style (example: anime, ghibli, sketch)', 'Transform into ghibli style medical diagram');
+      if (!stylePrompt?.trim()) return;
+      const sourceImage = window.prompt('Paste source image as data URL (data:image/...)');
+      if (!sourceImage?.startsWith('data:image/')) {
+        toast.error('Image conversion needs a valid data:image URL.');
+        return;
+      }
+      prompt = stylePrompt.trim();
+      image = sourceImage.trim();
+    }
+
     setAiLoading(true);
     try {
       const response = await fetch('/api/ai', {
@@ -84,6 +124,9 @@ export function NoteEditor() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action,
+          model,
+          prompt,
+          image,
           note: {
             title: note.title,
             content: note.content,
@@ -103,6 +146,11 @@ export function NoteEditor() {
       const data = (await response.json()) as {
         summaryPoints?: string[];
         flashcards?: Array<{ front: string; back: string }>;
+        generated?: {
+          model?: string;
+          previewImage?: string;
+          assetUrl?: string;
+        } | null;
       };
 
       if (action === 'summarize') {
@@ -115,7 +163,7 @@ export function NoteEditor() {
           updateNote(note.id, { content: `${note.content}<hr>${summaryHtml}` });
           toast.success('NVIDIA NIM summary added!');
         }
-      } else {
+      } else if (action === 'flashcards' || action === 'quiz') {
         const cards = (data.flashcards ?? [])
           .filter((c) => c.front && c.back)
           .slice(0, action === 'quiz' ? AI_QUIZ_CARD_LIMIT : AI_FLASHCARD_CARD_LIMIT);
@@ -126,10 +174,31 @@ export function NoteEditor() {
           cards.forEach((card) => addFlashcard(card.front, card.back, note.id, note.tags));
           toast.success(`NVIDIA NIM ${action === 'quiz' ? 'quiz cards' : 'flashcards'} generated!`);
         }
+      } else {
+        const safePreview = toSafeUrl(data.generated?.previewImage);
+        const safeAsset = toSafeUrl(data.generated?.assetUrl);
+        if (!safePreview && !safeAsset) {
+          toast.error('Generation completed but no preview URL was returned.');
+        } else {
+          const title = action === '3d' ? '🧊 AI 3D Generation' : action === 'diagram' ? '🖼️ AI Diagram/Photo Generation' : '🎨 AI Image Conversion';
+          const resultHtml = [
+            `<h3>${title}</h3>`,
+            `<p><strong>Model:</strong> ${escapeHtml(data.generated?.model ?? model)}</p>`,
+            `<p><strong>Prompt:</strong> ${escapeHtml(prompt)}</p>`,
+            safePreview ? `<p><img src="${escapeHtml(safePreview)}" alt="Generated output" /></p>` : '',
+            safeAsset ? `<p><a href="${escapeHtml(safeAsset)}" target="_blank" rel="noreferrer">Open generated asset</a></p>` : '',
+          ].join('');
+          updateNote(note.id, { content: `${note.content}<hr>${resultHtml}` });
+          toast.success(action === '3d' ? 'Trellis 3D generation added to note!' : 'FLUX generation result added to note!');
+        }
       }
     } catch {
-      applyLocalFallback(action);
-      toast.success(`${action === 'quiz' ? 'Quiz' : action === 'summarize' ? 'Summary' : 'Flashcards'} generated (local fallback)`);
+      if (action === 'summarize' || action === 'flashcards' || action === 'quiz') {
+        applyLocalFallback(action);
+        toast.success(`${action === 'quiz' ? 'Quiz' : action === 'summarize' ? 'Summary' : 'Flashcards'} generated (local fallback)`);
+      } else {
+        toast.error('NVIDIA generation failed. Check API key and prompt/image input.');
+      }
     }
     setAiLoading(false);
   };
@@ -309,21 +378,44 @@ export function NoteEditor() {
             )}
           </div>
 
-          <div className="relative group">
-            <button className={`p-1.5 rounded hover:bg-purple-50 text-purple-500 ${aiLoading ? 'animate-pulse' : ''}`} title="AI Tools">
+          <div className="relative">
+            <button
+              onClick={() => setShowAiDropdown((v) => !v)}
+              className={`p-1.5 rounded hover:bg-purple-50 text-purple-500 ${aiLoading ? 'animate-pulse' : ''}`}
+              title="AI Tools"
+            >
               <Sparkles size={15} />
             </button>
-            <div className="absolute right-0 top-full mt-1 w-44 bg-white border border-gray-200 rounded-xl shadow-lg z-50 p-1 hidden group-hover:block">
-              <button onClick={() => handleAI('summarize')} className="w-full text-left text-xs px-3 py-2 hover:bg-gray-100 rounded-lg flex items-center gap-2">
-                <AlignLeft size={12} /> Summarize note
-              </button>
-              <button onClick={() => handleAI('flashcards')} className="w-full text-left text-xs px-3 py-2 hover:bg-gray-100 rounded-lg flex items-center gap-2">
-                <Brain size={12} /> Generate flashcards
-              </button>
-              <button onClick={() => handleAI('quiz')} className="w-full text-left text-xs px-3 py-2 hover:bg-gray-100 rounded-lg flex items-center gap-2">
-                <BookOpen size={12} /> Generate quiz
-              </button>
-            </div>
+            {showAiDropdown && (
+              <div className="absolute right-0 top-full mt-1 w-64 bg-white border border-gray-200 rounded-xl shadow-lg z-50 p-2">
+                <p className="text-[11px] text-gray-500 px-1 mb-1">Image/diagram model</p>
+                <select
+                  className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 mb-2"
+                  value={imageModel}
+                  onChange={(e) => setImageModel(e.target.value as GenerationModel)}
+                >
+                  <option value="black-forest-labs/flux.1-kontext-dev">FLUX.1-Kontext-dev</option>
+                </select>
+                <button onClick={() => handleAI('summarize')} className="w-full text-left text-xs px-3 py-2 hover:bg-gray-100 rounded-lg flex items-center gap-2">
+                  <AlignLeft size={12} /> Summarize note
+                </button>
+                <button onClick={() => handleAI('flashcards')} className="w-full text-left text-xs px-3 py-2 hover:bg-gray-100 rounded-lg flex items-center gap-2">
+                  <Brain size={12} /> Generate flashcards
+                </button>
+                <button onClick={() => handleAI('quiz')} className="w-full text-left text-xs px-3 py-2 hover:bg-gray-100 rounded-lg flex items-center gap-2">
+                  <BookOpen size={12} /> Generate quiz
+                </button>
+                <button onClick={() => handleAI('diagram')} className="w-full text-left text-xs px-3 py-2 hover:bg-gray-100 rounded-lg flex items-center gap-2">
+                  <Sparkles size={12} /> Generate diagram/photo
+                </button>
+                <button onClick={() => handleAI('image-convert')} className="w-full text-left text-xs px-3 py-2 hover:bg-gray-100 rounded-lg flex items-center gap-2">
+                  <Sparkles size={12} /> Convert photo style (anime/ghibli)
+                </button>
+                <button onClick={() => handleAI('3d')} className="w-full text-left text-xs px-3 py-2 hover:bg-gray-100 rounded-lg flex items-center gap-2">
+                  <Sparkles size={12} /> Generate 3D model (Trellis)
+                </button>
+              </div>
+            )}
           </div>
 
           <button

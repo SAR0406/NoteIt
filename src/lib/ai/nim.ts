@@ -7,10 +7,12 @@ import {
 import { sanitizeModelText } from './text';
 
 const NVIDIA_NIM_BASE_URL = process.env.NVIDIA_NIM_BASE_URL || 'https://integrate.api.nvidia.com/v1';
+const NVIDIA_NIM_GENAI_BASE_URL = process.env.NVIDIA_NIM_GENAI_BASE_URL || 'https://ai.api.nvidia.com/v1/genai';
 const NVIDIA_NIM_MODEL = process.env.NVIDIA_NIM_MODEL || 'openai/gpt-oss-120b';
 const NVIDIA_NIM_USE_CASE = process.env.NVIDIA_NIM_USE_CASE || 'Retrieval Augmented Generation';
 
-type AIAction = 'summarize' | 'flashcards' | 'quiz';
+type AIAction = 'summarize' | 'flashcards' | 'quiz' | 'diagram' | 'image-convert' | '3d';
+type GenerationModel = 'black-forest-labs/flux.1-kontext-dev' | 'microsoft/trellis';
 
 export interface NIMRequestPayload {
   action: AIAction;
@@ -20,11 +22,21 @@ export interface NIMRequestPayload {
   handwritingIndex: string;
   attachmentIndex: string[];
   drawingIndex: string[];
+  prompt?: string;
+  image?: string;
+  model?: GenerationModel;
 }
 
 interface NIMResult {
   summaryPoints?: string[];
   flashcards?: Array<{ front: string; back: string }>;
+  generated?: {
+    action: AIAction;
+    model: GenerationModel;
+    raw: unknown;
+    previewImage?: string;
+    assetUrl?: string;
+  };
 }
 
 const stripHtml = (value: string) => {
@@ -83,10 +95,136 @@ const parseAiOutput = (text: string): NIMResult => {
   }
 };
 
+const toSafeHttpUrl = (value: unknown) => {
+  if (typeof value !== 'string') return undefined;
+  const normalized = value.trim();
+  if (!normalized) return undefined;
+  if (normalized.startsWith('https://') || normalized.startsWith('http://')) return normalized;
+  return undefined;
+};
+
+const toSafeDataImage = (value: unknown) => {
+  if (typeof value !== 'string') return undefined;
+  const normalized = value.trim();
+  if (!normalized) return undefined;
+  if (normalized.startsWith('data:image/')) return normalized;
+  return undefined;
+};
+
+const readNestedString = (value: unknown, keys: string[]) => {
+  if (!value || typeof value !== 'object') return undefined;
+  let cursor: unknown = value;
+  for (const key of keys) {
+    if (!cursor || typeof cursor !== 'object' || !(key in cursor)) return undefined;
+    cursor = (cursor as Record<string, unknown>)[key];
+  }
+  return typeof cursor === 'string' ? cursor : undefined;
+};
+
+const extractPreviewImage = (raw: unknown) => {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const direct = toSafeDataImage(readNestedString(raw, ['image'])) ?? toSafeHttpUrl(readNestedString(raw, ['image']));
+  if (direct) return direct;
+
+  const firstImages = readNestedString(raw, ['images', '0']) ?? readNestedString(raw, ['output', '0', 'url']);
+  if (firstImages) return toSafeDataImage(firstImages) ?? toSafeHttpUrl(firstImages);
+
+  const artifactUrl = readNestedString(raw, ['artifacts', '0', 'url']);
+  if (artifactUrl) return toSafeHttpUrl(artifactUrl);
+
+  return undefined;
+};
+
+const extractAssetUrl = (raw: unknown) => {
+  if (!raw || typeof raw !== 'object') return undefined;
+  return (
+    toSafeHttpUrl(readNestedString(raw, ['asset_url'])) ??
+    toSafeHttpUrl(readNestedString(raw, ['model_url'])) ??
+    toSafeHttpUrl(readNestedString(raw, ['mesh_url'])) ??
+    toSafeHttpUrl(readNestedString(raw, ['url'])) ??
+    toSafeHttpUrl(readNestedString(raw, ['artifacts', '0', 'url']))
+  );
+};
+
+const resolveGenerationModel = (payload: NIMRequestPayload): GenerationModel => {
+  if (payload.action === '3d') return 'microsoft/trellis';
+  return payload.model ?? 'black-forest-labs/flux.1-kontext-dev';
+};
+
+const callGenerationModel = async (
+  payload: NIMRequestPayload,
+  apiKey: string
+): Promise<NIMResult['generated']> => {
+  const model = resolveGenerationModel(payload);
+  const prompt = payload.prompt?.trim();
+  if (!prompt) throw new Error('Prompt is required for generation');
+
+  let body: Record<string, unknown>;
+  if (payload.action === '3d') {
+    body = {
+      prompt,
+      slat_cfg_scale: 3,
+      ss_cfg_scale: 7.5,
+      slat_sampling_steps: 25,
+      ss_sampling_steps: 25,
+      seed: 0,
+    };
+  } else if (payload.action === 'image-convert') {
+    if (!payload.image?.startsWith('data:image/')) {
+      throw new Error('A valid image data URL is required for image conversion');
+    }
+    body = {
+      prompt,
+      image: payload.image,
+      aspect_ratio: 'match_input_image',
+      steps: 30,
+      cfg_scale: 3.5,
+      seed: 0,
+    };
+  } else {
+    body = {
+      prompt,
+      aspect_ratio: '16:9',
+      steps: 30,
+      cfg_scale: 3.5,
+      seed: 0,
+    };
+  }
+
+  const response = await fetch(`${NVIDIA_NIM_GENAI_BASE_URL}/${model}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const responseText = await response.text();
+    throw new Error(`NIM generation request failed (${response.status}): ${responseText.slice(0, 200)}`);
+  }
+
+  const raw = (await response.json()) as unknown;
+  return {
+    action: payload.action,
+    model,
+    raw,
+    previewImage: extractPreviewImage(raw),
+    assetUrl: extractAssetUrl(raw),
+  };
+};
+
 export async function generateWithNIM(payload: NIMRequestPayload): Promise<NIMResult> {
   const apiKey = process.env.NVIDIA_API_KEY;
   if (!apiKey) {
     throw new Error('NVIDIA_API_KEY is not configured');
+  }
+
+  if (payload.action === 'diagram' || payload.action === 'image-convert' || payload.action === '3d') {
+    const generated = await callGenerationModel(payload, apiKey);
+    return { generated };
   }
 
   const plainText = clip(stripHtml(payload.htmlContent));
