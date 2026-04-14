@@ -93,10 +93,11 @@ export function NoteCanvasBoard({ note }: Props) {
     const canvas = drawCanvasRef.current;
     if (!canvas) return;
     const dataUrl = canvas.toDataURL('image/png');
+    const timeLabel = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     addSticker({
       id: generateId(),
       type: 'image',
-      name: 'Handwriting Sticker',
+      name: `Handwriting ${timeLabel}`,
       dataUrl,
       x: 24,
       y: 24,
