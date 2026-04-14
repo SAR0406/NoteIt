@@ -4,24 +4,11 @@ import React, { useRef, useState } from 'react';
 import { Eraser, Save, Trash2 } from 'lucide-react';
 import { Note } from '@/types';
 import { useStore } from '@/store/useStore';
+import { applyBrushStyle, BrushPreset, drawShape, DrawingStyle, ShapeTool } from '@/lib/drawing-tools';
 
 interface Props {
   note: Note;
 }
-
-type BrushPreset = 'pen' | 'marker' | 'highlighter' | 'watercolor' | 'brush';
-type ShapeTool = 'freehand' | 'line' | 'rectangle' | 'circle';
-
-const hexToRgba = (hex: string, alpha: number) => {
-  const normalized = hex.replace('#', '');
-  const value = normalized.length === 3
-    ? normalized.split('').map((ch) => `${ch}${ch}`).join('')
-    : normalized.padEnd(6, '0').slice(0, 6);
-  const r = Number.parseInt(value.slice(0, 2), 16);
-  const g = Number.parseInt(value.slice(2, 4), 16);
-  const b = Number.parseInt(value.slice(4, 6), 16);
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-};
 
 export function HandwritingPad({ note }: Props) {
   const { addDrawingToNote, removeDrawingFromNote, setHandwritingIndex } = useStore();
@@ -44,67 +31,7 @@ export function HandwritingPad({ note }: Props) {
     };
   };
 
-  const applyBrushStyle = (ctx: CanvasRenderingContext2D) => {
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.shadowBlur = 0;
-    ctx.shadowColor = 'transparent';
-    ctx.globalCompositeOperation = 'source-over';
-    ctx.strokeStyle = penColor;
-    ctx.lineWidth = penSize;
-
-    if (brushPreset === 'marker') {
-      ctx.lineWidth = penSize * 1.8;
-      ctx.strokeStyle = hexToRgba(penColor, 0.85);
-      return;
-    }
-    if (brushPreset === 'highlighter') {
-      ctx.lineWidth = penSize * 3.1;
-      ctx.strokeStyle = hexToRgba(penColor, 0.35);
-      ctx.globalCompositeOperation = 'multiply';
-      return;
-    }
-    if (brushPreset === 'watercolor') {
-      ctx.lineWidth = penSize * 4;
-      ctx.strokeStyle = hexToRgba(penColor, 0.2);
-      ctx.shadowBlur = 10 + penSize;
-      ctx.shadowColor = hexToRgba(penColor, 0.35);
-      return;
-    }
-    if (brushPreset === 'brush') {
-      ctx.lineWidth = penSize * 2.3;
-      ctx.strokeStyle = hexToRgba(penColor, 0.7);
-    }
-  };
-
-  const drawShape = (
-    ctx: CanvasRenderingContext2D,
-    start: { x: number; y: number },
-    current: { x: number; y: number }
-  ) => {
-    applyBrushStyle(ctx);
-    if (shapeTool === 'line') {
-      ctx.beginPath();
-      ctx.moveTo(start.x, start.y);
-      ctx.lineTo(current.x, current.y);
-      ctx.stroke();
-      return;
-    }
-    if (shapeTool === 'rectangle') {
-      const x = Math.min(start.x, current.x);
-      const y = Math.min(start.y, current.y);
-      const width = Math.abs(current.x - start.x);
-      const height = Math.abs(current.y - start.y);
-      ctx.strokeRect(x, y, width, height);
-      return;
-    }
-    if (shapeTool === 'circle') {
-      const radius = Math.hypot(current.x - start.x, current.y - start.y);
-      ctx.beginPath();
-      ctx.arc(start.x, start.y, radius, 0, Math.PI * 2);
-      ctx.stroke();
-    }
-  };
+  const drawingStyle: DrawingStyle = { color: penColor, size: penSize, preset: brushPreset };
 
   const start = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
@@ -113,7 +40,7 @@ export function HandwritingPad({ note }: Props) {
     const point = getPoint(e, canvas);
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    applyBrushStyle(ctx);
+    applyBrushStyle(ctx, drawingStyle);
     drawStartRef.current = point;
     if (shapeTool === 'freehand') {
       ctx.beginPath();
@@ -132,7 +59,7 @@ export function HandwritingPad({ note }: Props) {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     if (shapeTool === 'freehand') {
-      applyBrushStyle(ctx);
+      applyBrushStyle(ctx, drawingStyle);
       ctx.lineTo(point.x, point.y);
       ctx.stroke();
       ctx.beginPath();
@@ -143,7 +70,7 @@ export function HandwritingPad({ note }: Props) {
     const snapshot = drawSnapshotRef.current;
     if (!start || !snapshot) return;
     ctx.putImageData(snapshot, 0, 0);
-    drawShape(ctx, start, point);
+    drawShape(ctx, start, point, shapeTool, drawingStyle);
   };
 
   const stop = (e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -156,7 +83,7 @@ export function HandwritingPad({ note }: Props) {
     if (drawing && shapeTool !== 'freehand' && ctx && drawStartRef.current && drawSnapshotRef.current) {
       const point = getPoint(e, canvas);
       ctx.putImageData(drawSnapshotRef.current, 0, 0);
-      drawShape(ctx, drawStartRef.current, point);
+      drawShape(ctx, drawStartRef.current, point, shapeTool, drawingStyle);
     }
     setDrawing(false);
     ctx?.closePath();
@@ -203,17 +130,19 @@ export function HandwritingPad({ note }: Props) {
             <select
               value={brushPreset}
               onChange={(e) => setBrushPreset(e.target.value as BrushPreset)}
+              aria-label="Select brush preset"
               className="border border-gray-200 rounded px-2 py-1 text-xs"
             >
               <option value="pen">Pen</option>
               <option value="marker">Marker</option>
               <option value="highlighter">Highlighter</option>
               <option value="watercolor">Watercolor</option>
-              <option value="brush">China brush</option>
+              <option value="brush">Brush</option>
             </select>
             <select
               value={shapeTool}
               onChange={(e) => setShapeTool(e.target.value as ShapeTool)}
+              aria-label="Select shape tool"
               className="border border-gray-200 rounded px-2 py-1 text-xs"
             >
               <option value="freehand">Freehand</option>

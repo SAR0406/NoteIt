@@ -5,6 +5,7 @@ import { Eraser, Pencil, Save, Shapes, Trash2 } from 'lucide-react';
 import { Note, CanvasSticker } from '@/types';
 import { useStore } from '@/store/useStore';
 import { generateId } from '@/lib/utils';
+import { applyBrushStyle, BrushPreset, drawShape, DrawingStyle, ShapeTool } from '@/lib/drawing-tools';
 import toast from 'react-hot-toast';
 
 interface Props {
@@ -15,19 +16,6 @@ const BOARD_WIDTH = 980;
 const BOARD_HEIGHT = 620;
 
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(value, max));
-const hexToRgba = (hex: string, alpha: number) => {
-  const normalized = hex.replace('#', '');
-  const value = normalized.length === 3
-    ? normalized.split('').map((ch) => `${ch}${ch}`).join('')
-    : normalized.padEnd(6, '0').slice(0, 6);
-  const r = Number.parseInt(value.slice(0, 2), 16);
-  const g = Number.parseInt(value.slice(2, 4), 16);
-  const b = Number.parseInt(value.slice(4, 6), 16);
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-};
-
-type BrushPreset = 'pen' | 'marker' | 'highlighter' | 'watercolor' | 'brush';
-type ShapeTool = 'freehand' | 'line' | 'rectangle' | 'circle';
 
 export function NoteCanvasBoard({ note }: Props) {
   const { updateNote } = useStore();
@@ -108,67 +96,7 @@ export function NoteCanvasBoard({ note }: Props) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
   };
 
-  const applyBrushStyle = (ctx: CanvasRenderingContext2D) => {
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.shadowBlur = 0;
-    ctx.shadowColor = 'transparent';
-    ctx.globalCompositeOperation = 'source-over';
-    ctx.strokeStyle = brushColor;
-    ctx.lineWidth = brushSize;
-
-    if (brushPreset === 'marker') {
-      ctx.lineWidth = brushSize * 1.8;
-      ctx.strokeStyle = hexToRgba(brushColor, 0.85);
-      return;
-    }
-    if (brushPreset === 'highlighter') {
-      ctx.lineWidth = brushSize * 3.2;
-      ctx.strokeStyle = hexToRgba(brushColor, 0.35);
-      ctx.globalCompositeOperation = 'multiply';
-      return;
-    }
-    if (brushPreset === 'watercolor') {
-      ctx.lineWidth = brushSize * 4;
-      ctx.strokeStyle = hexToRgba(brushColor, 0.2);
-      ctx.shadowBlur = 10 + brushSize;
-      ctx.shadowColor = hexToRgba(brushColor, 0.35);
-      return;
-    }
-    if (brushPreset === 'brush') {
-      ctx.lineWidth = brushSize * 2.3;
-      ctx.strokeStyle = hexToRgba(brushColor, 0.7);
-    }
-  };
-
-  const drawShape = (
-    ctx: CanvasRenderingContext2D,
-    start: { x: number; y: number },
-    current: { x: number; y: number }
-  ) => {
-    applyBrushStyle(ctx);
-    if (shapeTool === 'line') {
-      ctx.beginPath();
-      ctx.moveTo(start.x, start.y);
-      ctx.lineTo(current.x, current.y);
-      ctx.stroke();
-      return;
-    }
-    if (shapeTool === 'rectangle') {
-      const x = Math.min(start.x, current.x);
-      const y = Math.min(start.y, current.y);
-      const width = Math.abs(current.x - start.x);
-      const height = Math.abs(current.y - start.y);
-      ctx.strokeRect(x, y, width, height);
-      return;
-    }
-    if (shapeTool === 'circle') {
-      const radius = Math.hypot(current.x - start.x, current.y - start.y);
-      ctx.beginPath();
-      ctx.arc(start.x, start.y, radius, 0, Math.PI * 2);
-      ctx.stroke();
-    }
-  };
+  const drawingStyle: DrawingStyle = { color: brushColor, size: brushSize, preset: brushPreset };
 
   const getCanvasPoint = (event: React.PointerEvent<HTMLCanvasElement>, canvas: HTMLCanvasElement) => {
     const rect = canvas.getBoundingClientRect();
@@ -186,7 +114,7 @@ export function NoteCanvasBoard({ note }: Props) {
     addSticker({
       id: generateId(),
       type: 'image',
-      name: `Handwriting ${timeLabel}`,
+      name: `Drawing ${timeLabel}`,
       dataUrl,
       x: 24,
       y: 24,
@@ -195,7 +123,7 @@ export function NoteCanvasBoard({ note }: Props) {
       createdAt: new Date().toISOString(),
     });
     clearDrawLayer();
-    toast.success('Handwriting saved as movable sticker.');
+    toast.success('Drawing saved as movable sticker.');
   };
 
   const startDrawing: React.PointerEventHandler<HTMLCanvasElement> = (event) => {
@@ -205,7 +133,7 @@ export function NoteCanvasBoard({ note }: Props) {
     if (!canvas || !ctx) return;
     canvas.setPointerCapture(event.pointerId);
     const point = getCanvasPoint(event, canvas);
-    applyBrushStyle(ctx);
+    applyBrushStyle(ctx, drawingStyle);
     drawStartRef.current = point;
     if (shapeTool === 'freehand') {
       ctx.beginPath();
@@ -223,7 +151,7 @@ export function NoteCanvasBoard({ note }: Props) {
     if (!canvas || !ctx) return;
     const point = getCanvasPoint(event, canvas);
     if (shapeTool === 'freehand') {
-      applyBrushStyle(ctx);
+      applyBrushStyle(ctx, drawingStyle);
       ctx.lineTo(point.x, point.y);
       ctx.stroke();
       ctx.beginPath();
@@ -234,7 +162,7 @@ export function NoteCanvasBoard({ note }: Props) {
     const snapshot = drawSnapshotRef.current;
     if (!start || !snapshot) return;
     ctx.putImageData(snapshot, 0, 0);
-    drawShape(ctx, start, point);
+    drawShape(ctx, start, point, shapeTool, drawingStyle);
   };
 
   const stopDrawing: React.PointerEventHandler<HTMLCanvasElement> = (event) => {
@@ -246,7 +174,7 @@ export function NoteCanvasBoard({ note }: Props) {
     if (drawing && shapeTool !== 'freehand' && canvas && ctx && drawStartRef.current && drawSnapshotRef.current) {
       const point = getCanvasPoint(event, canvas);
       ctx.putImageData(drawSnapshotRef.current, 0, 0);
-      drawShape(ctx, drawStartRef.current, point);
+      drawShape(ctx, drawStartRef.current, point, shapeTool, drawingStyle);
     }
     setDrawing(false);
     ctx?.closePath();
@@ -312,13 +240,14 @@ export function NoteCanvasBoard({ note }: Props) {
           <select
             value={brushPreset}
             onChange={(event) => setBrushPreset(event.target.value as BrushPreset)}
+            aria-label="Select brush preset"
             className="text-xs bg-transparent outline-none"
           >
             <option value="pen">Pen</option>
             <option value="marker">Marker</option>
             <option value="highlighter">Highlighter</option>
             <option value="watercolor">Watercolor</option>
-            <option value="brush">China brush</option>
+            <option value="brush">Brush</option>
           </select>
         </div>
         <div className="inline-flex items-center gap-1 border rounded px-1.5 py-1 bg-white">
@@ -326,6 +255,7 @@ export function NoteCanvasBoard({ note }: Props) {
           <select
             value={shapeTool}
             onChange={(event) => setShapeTool(event.target.value as ShapeTool)}
+            aria-label="Select shape tool"
             className="text-xs bg-transparent outline-none"
           >
             <option value="freehand">Freehand</option>
