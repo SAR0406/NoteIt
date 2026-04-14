@@ -8,8 +8,7 @@ const GENERATION_ACTION_SET = new Set<string>(GENERATION_ACTIONS);
 const MAX_IMAGE_DATA_URL_LENGTH = 8_000_000;
 const IMAGE_DATA_URL_PATTERN = /^data:image\/[a-zA-Z0-9.+-]+;base64,[A-Za-z0-9+/]+={0,2}$/;
 const VALID_GENERATION_MODELS = [
-  'black-forest-labs/flux.1-kontext-dev',
-  'black-forest-labs/flux.1-schnell',
+  'black-forest-labs/flux.2-klein-4b',
   'microsoft/trellis',
 ] as const;
 
@@ -17,7 +16,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as {
       action?: 'summarize' | 'flashcards' | 'quiz' | 'diagram' | 'image-convert' | '3d';
-      model?: 'black-forest-labs/flux.1-kontext-dev' | 'black-forest-labs/flux.1-schnell' | 'microsoft/trellis';
+      model?: 'black-forest-labs/flux.2-klein-4b' | 'microsoft/trellis';
       prompt?: string;
       image?: string;
       note?: {

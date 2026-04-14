@@ -4,6 +4,7 @@ import React, { useRef, useState } from 'react';
 import { Eraser, Save, Trash2 } from 'lucide-react';
 import { Note } from '@/types';
 import { useStore } from '@/store/useStore';
+import { applyBrushStyle, BrushPreset, drawShape, DrawingStyle, ShapeTool } from '@/lib/drawing-tools';
 
 interface Props {
   note: Note;
@@ -15,20 +16,38 @@ export function HandwritingPad({ note }: Props) {
   const [drawing, setDrawing] = useState(false);
   const [penSize, setPenSize] = useState(2.5);
   const [penColor, setPenColor] = useState('#111827');
+  const [brushPreset, setBrushPreset] = useState<BrushPreset>('pen');
+  const [shapeTool, setShapeTool] = useState<ShapeTool>('freehand');
   const [title, setTitle] = useState('Anatomy Diagram');
   const [indexedText, setIndexedText] = useState(note.handwritingIndex ?? '');
+  const drawStartRef = useRef<{ x: number; y: number } | null>(null);
+  const drawSnapshotRef = useRef<ImageData | null>(null);
+
+  const getPoint = (e: React.PointerEvent<HTMLCanvasElement>, canvas: HTMLCanvasElement) => {
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: ((e.clientX - rect.left) / rect.width) * canvas.width,
+      y: ((e.clientY - rect.top) / rect.height) * canvas.height,
+    };
+  };
+
+  const drawingStyle: DrawingStyle = { color: penColor, size: penSize, preset: brushPreset };
 
   const start = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     canvas.setPointerCapture(e.pointerId);
-    const rect = canvas.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width) * canvas.width;
-    const y = ((e.clientY - rect.top) / rect.height) * canvas.height;
+    const point = getPoint(e, canvas);
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    ctx.beginPath();
-    ctx.moveTo(x, y);
+    applyBrushStyle(ctx, drawingStyle);
+    drawStartRef.current = point;
+    if (shapeTool === 'freehand') {
+      ctx.beginPath();
+      ctx.moveTo(point.x, point.y);
+    } else {
+      drawSnapshotRef.current = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    }
     setDrawing(true);
   };
 
@@ -36,19 +55,22 @@ export function HandwritingPad({ note }: Props) {
     if (!drawing) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width) * canvas.width;
-    const y = ((e.clientY - rect.top) / rect.height) * canvas.height;
+    const point = getPoint(e, canvas);
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    ctx.strokeStyle = penColor;
-    ctx.lineWidth = penSize;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.lineTo(x, y);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(x, y);
+    if (shapeTool === 'freehand') {
+      applyBrushStyle(ctx, drawingStyle);
+      ctx.lineTo(point.x, point.y);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(point.x, point.y);
+      return;
+    }
+    const start = drawStartRef.current;
+    const snapshot = drawSnapshotRef.current;
+    if (!start || !snapshot) return;
+    ctx.putImageData(snapshot, 0, 0);
+    drawShape(ctx, start, point, shapeTool, drawingStyle);
   };
 
   const stop = (e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -57,9 +79,16 @@ export function HandwritingPad({ note }: Props) {
     if (canvas.hasPointerCapture(e.pointerId)) {
       canvas.releasePointerCapture(e.pointerId);
     }
-    setDrawing(false);
     const ctx = canvas.getContext('2d');
+    if (drawing && shapeTool !== 'freehand' && ctx && drawStartRef.current && drawSnapshotRef.current) {
+      const point = getPoint(e, canvas);
+      ctx.putImageData(drawSnapshotRef.current, 0, 0);
+      drawShape(ctx, drawStartRef.current, point, shapeTool, drawingStyle);
+    }
+    setDrawing(false);
     ctx?.closePath();
+    drawStartRef.current = null;
+    drawSnapshotRef.current = null;
   };
 
   const clearCanvas = () => {
@@ -99,15 +128,27 @@ export function HandwritingPad({ note }: Props) {
               placeholder="Diagram title"
             />
             <select
-              value={penColor}
-              onChange={(e) => setPenColor(e.target.value)}
+              value={brushPreset}
+              onChange={(e) => setBrushPreset(e.target.value as BrushPreset)}
+              aria-label="Select brush preset"
               className="border border-gray-200 rounded px-2 py-1 text-xs"
             >
-              <option value="#111827">Black</option>
-              <option value="#dc2626">Red</option>
-              <option value="#1d4ed8">Blue</option>
-              <option value="#059669">Green</option>
-              <option value="#7c3aed">Purple</option>
+              <option value="pen">Pen</option>
+              <option value="marker">Marker</option>
+              <option value="highlighter">Highlighter</option>
+              <option value="watercolor">Watercolor</option>
+              <option value="brush">Brush</option>
+            </select>
+            <select
+              value={shapeTool}
+              onChange={(e) => setShapeTool(e.target.value as ShapeTool)}
+              aria-label="Select shape tool"
+              className="border border-gray-200 rounded px-2 py-1 text-xs"
+            >
+              <option value="freehand">Freehand</option>
+              <option value="line">Line</option>
+              <option value="rectangle">Rectangle</option>
+              <option value="circle">Circle</option>
             </select>
             <label className="text-xs text-gray-600 inline-flex items-center gap-2">
               Size
@@ -118,6 +159,15 @@ export function HandwritingPad({ note }: Props) {
                 step={0.5}
                 value={penSize}
                 onChange={(e) => setPenSize(Number(e.target.value))}
+              />
+            </label>
+            <label className="text-xs text-gray-600 inline-flex items-center gap-1">
+              Color
+              <input
+                type="color"
+                value={penColor}
+                onChange={(e) => setPenColor(e.target.value)}
+                className="h-6 w-8 p-0 border border-gray-200 rounded"
               />
             </label>
             <button onClick={clearCanvas} className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded border hover:bg-gray-100">
