@@ -18,6 +18,7 @@ import { formatDate } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { DocumentWorkspace } from '@/components/documents/DocumentWorkspace';
 import { HandwritingPad } from './HandwritingPad';
+import { NoteCanvasBoard } from './NoteCanvasBoard';
 import { AI_FLASHCARD_CARD_LIMIT, AI_QUIZ_CARD_LIMIT, AI_SUMMARY_POINT_LIMIT } from '@/lib/ai/constants';
 import { escapeHtml } from '@/lib/ai/text';
 
@@ -468,6 +469,7 @@ export function NoteEditor() {
       <div className="flex-1 overflow-hidden flex">
         <div className={`overflow-y-auto px-6 py-4 ${splitMode ? 'w-[60%]' : 'w-full'}`}>
           <EditorContent editor={editor} />
+          <NoteCanvasBoard note={note} />
           <div className="mt-6">
             <HandwritingPad note={note} />
           </div>

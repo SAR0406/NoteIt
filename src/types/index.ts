@@ -18,6 +18,18 @@ export interface DrawingLayer {
   createdAt: string;
 }
 
+export interface CanvasSticker {
+  id: string;
+  type: 'image' | 'audio';
+  name: string;
+  dataUrl: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  createdAt: string;
+}
+
 export interface Notebook {
   id: string;
   name: string;
@@ -61,6 +73,7 @@ export interface Note {
   templateType: TemplateType | null;
   attachments: NoteAttachment[];
   drawings: DrawingLayer[];
+  canvasStickers: CanvasSticker[];
   handwritingIndex: string;
   isFavorite: boolean;
   isPinned: boolean;
