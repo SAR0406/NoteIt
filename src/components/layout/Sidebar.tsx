@@ -4,7 +4,7 @@ import { useStore } from '@/store/useStore';
 import {
   Plus, ChevronRight, ChevronDown, Search,
   Layers, Brain, Mic, Link2, FileText, Home, Menu, X,
-  Trash2, LayoutTemplate, Files, Cloud
+  Trash2, LayoutTemplate, Files, Cloud, GraduationCap, BarChart3, Users
 } from 'lucide-react';
 import { NOTEBOOK_COLORS } from '@/lib/templates';
 
@@ -51,7 +51,7 @@ export function Sidebar() {
     return (
       <button
         onClick={() => setSidebarOpen(true)}
-        className="fixed top-4 left-4 z-50 bg-white shadow-lg rounded-lg p-2 hover:bg-gray-50"
+        className="fixed top-4 left-4 z-50 surface-card rounded-xl p-2 hover:bg-[var(--surface-muted)]"
       >
         <Menu size={20} />
       </button>
@@ -59,25 +59,25 @@ export function Sidebar() {
   }
 
   return (
-    <aside className="w-64 bg-gray-900 text-white flex flex-col h-screen overflow-hidden flex-shrink-0">
+    <aside className="w-[18.25rem] bg-[#0c1536] text-white flex flex-col h-screen overflow-hidden flex-shrink-0 border-r border-[#1f2b57]">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-4 border-b border-gray-700">
+      <div className="flex items-center justify-between px-4 py-4 border-b border-[#223265] bg-[#0a1330]">
         <div className="flex items-center gap-2">
-          <Brain size={22} className="text-blue-400" />
+          <Brain size={22} className="text-indigo-300" />
           <span className="font-bold text-lg">NoteIt</span>
-          <span className="text-xs text-gray-400 font-normal">MBBS</span>
+          <span className="text-xs text-indigo-200/70 font-normal">MBBS</span>
         </div>
-        <button onClick={() => setSidebarOpen(false)} className="text-gray-400 hover:text-white">
+        <button onClick={() => setSidebarOpen(false)} className="text-indigo-200/70 hover:text-white">
           <X size={18} />
         </button>
       </div>
 
       {/* Search */}
-      <div className="px-3 py-2 border-b border-gray-700">
-        <div className="flex items-center gap-2 bg-gray-800 rounded-lg px-3 py-2">
-          <Search size={14} className="text-gray-400" />
+      <div className="px-3 py-3 border-b border-[#223265]">
+        <div className="flex items-center gap-2 bg-[#111d46] rounded-xl px-3 py-2 border border-[#243264]">
+          <Search size={14} className="text-indigo-200/60" />
           <input
-            className="bg-transparent text-sm text-white placeholder-gray-400 outline-none flex-1 min-w-0"
+            className="bg-transparent text-sm text-white placeholder-indigo-200/40 outline-none flex-1 min-w-0"
             placeholder="Search notes..."
             value={searchQuery}
             onChange={(e) => { setSearchQuery(e.target.value); setActiveView('search'); }}
@@ -89,6 +89,8 @@ export function Sidebar() {
         {/* Main Nav */}
         <nav className="px-2 py-2 space-y-1">
           <NavItem icon={<Home size={16} />} label="Home" active={activeView === 'home'} onClick={() => setActiveView('home')} />
+          <NavItem icon={<GraduationCap size={16} />} label="Subjects" active={activeView === 'subjects'} onClick={() => setActiveView('subjects')} />
+          <NavItem icon={<FileText size={16} />} label="Notes" active={activeView === 'notes' || activeView === 'note-editor'} onClick={() => setActiveView('notes')} />
           <NavItem
             icon={<Brain size={16} />}
             label="Flashcards"
@@ -99,14 +101,16 @@ export function Sidebar() {
           <NavItem icon={<Link2 size={16} />} label="Note Graph" active={activeView === 'graph'} onClick={() => setActiveView('graph')} />
           <NavItem icon={<Files size={16} />} label="Documents" active={activeView === 'documents'} onClick={() => setActiveView('documents')} />
           <NavItem icon={<Mic size={16} />} label="Audio Notes" active={activeView === 'audio'} onClick={() => setActiveView('audio')} />
+          <NavItem icon={<BarChart3 size={16} />} label="Progress" active={activeView === 'progress'} onClick={() => setActiveView('progress')} />
+          <NavItem icon={<Users size={16} />} label="Collaboration" active={activeView === 'collaboration'} onClick={() => setActiveView('collaboration')} />
           <NavItem icon={<LayoutTemplate size={16} />} label="Templates" active={activeView === 'templates'} onClick={() => setActiveView('templates')} />
           <NavItem icon={<Cloud size={16} />} label="Sync" active={activeView === 'sync'} onClick={() => setActiveView('sync')} />
         </nav>
 
         {/* Tags */}
         {allTags.length > 0 && (
-          <div className="px-3 py-2 border-t border-gray-700">
-            <p className="text-xs text-gray-500 uppercase font-semibold mb-1">Tags</p>
+          <div className="px-3 py-2 border-t border-[#223265]">
+            <p className="text-[11px] text-indigo-200/50 uppercase font-semibold mb-1">Tags</p>
             <div className="flex flex-wrap gap-1">
               {allTags.map((tag) => (
                 <button
@@ -114,8 +118,8 @@ export function Sidebar() {
                   onClick={() => { setActiveTag(activeTag === tag ? null : tag); setActiveView('search'); }}
                   className={`text-xs px-2 py-0.5 rounded-full border ${
                     activeTag === tag
-                      ? 'bg-blue-600 border-blue-500 text-white'
-                      : 'border-gray-600 text-gray-300 hover:border-blue-500'
+                      ? 'bg-indigo-500 border-indigo-400 text-white'
+                      : 'border-[#3a4b84] text-indigo-100/90 hover:border-indigo-300'
                   }`}
                 >
                   {tag}
@@ -126,12 +130,12 @@ export function Sidebar() {
         )}
 
         {/* Notebooks */}
-        <div className="px-2 py-2 border-t border-gray-700">
+        <div className="px-2 py-2 border-t border-[#223265]">
           <div className="flex items-center justify-between px-2 mb-1">
-            <span className="text-xs text-gray-500 uppercase font-semibold">Notebooks</span>
+            <span className="text-[11px] text-indigo-200/50 uppercase font-semibold">Notebooks</span>
             <button
               onClick={() => setAddingNotebook(true)}
-              className="text-gray-400 hover:text-white"
+              className="text-indigo-200/70 hover:text-white"
               title="Add notebook"
             >
               <Plus size={14} />
@@ -152,7 +156,7 @@ export function Sidebar() {
             >
               <input
                 autoFocus
-                className="w-full bg-gray-700 text-white text-sm rounded px-2 py-1 outline-none"
+                className="w-full bg-[#111d46] border border-[#29386b] text-white text-sm rounded px-2 py-1 outline-none"
                 placeholder="Notebook name..."
                 value={newNbName}
                 onChange={(e) => setNewNbName(e.target.value)}
@@ -167,13 +171,13 @@ export function Sidebar() {
             return (
               <div key={nb.id}>
                 <div
-                  className={`flex items-center gap-1 px-2 py-1.5 rounded-lg cursor-pointer hover:bg-gray-700 group ${
-                    selectedNotebookId === nb.id ? 'bg-gray-700' : ''
+                  className={`flex items-center gap-1 px-2 py-1.5 rounded-lg cursor-pointer hover:bg-[#111d46] group ${
+                    selectedNotebookId === nb.id ? 'bg-[#111d46]' : ''
                   }`}
                   onClick={() => { toggleNb(nb.id); selectNotebook(nb.id); setActiveView('notes'); }}
                 >
                   <button
-                    className="text-gray-400 flex-shrink-0"
+                    className="text-indigo-200/60 flex-shrink-0"
                     onClick={(e) => { e.stopPropagation(); toggleNb(nb.id); }}
                   >
                     {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
@@ -182,7 +186,7 @@ export function Sidebar() {
                   <span className="flex-1 text-sm truncate">{nb.name}</span>
                   <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: nb.color }} />
                   <button
-                    className="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-400 flex-shrink-0"
+                    className="opacity-0 group-hover:opacity-100 text-indigo-200/50 hover:text-red-300 flex-shrink-0"
                     onClick={(e) => { e.stopPropagation(); deleteNotebook(nb.id); }}
                     title="Delete notebook"
                   >
@@ -198,26 +202,26 @@ export function Sidebar() {
                       return (
                         <div key={sub.id}>
                           <div
-                            className={`flex items-center gap-1 px-2 py-1 rounded-lg cursor-pointer hover:bg-gray-700 group ${
-                              selectedSubjectId === sub.id ? 'bg-gray-700' : ''
+                            className={`flex items-center gap-1 px-2 py-1 rounded-lg cursor-pointer hover:bg-[#111d46] group ${
+                              selectedSubjectId === sub.id ? 'bg-[#111d46]' : ''
                             }`}
                             onClick={() => { toggleSub(sub.id); selectSubject(sub.id); setActiveView('notes'); }}
                           >
-                            <button onClick={(e) => { e.stopPropagation(); toggleSub(sub.id); }} className="text-gray-400">
+                            <button onClick={(e) => { e.stopPropagation(); toggleSub(sub.id); }} className="text-indigo-200/60">
                               {subExpanded ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
                             </button>
-                            <Layers size={12} className="text-gray-400 flex-shrink-0" />
+                            <Layers size={12} className="text-indigo-200/70 flex-shrink-0" />
                             <span className="flex-1 text-xs truncate">{sub.name}</span>
                             <div className="flex gap-1 opacity-0 group-hover:opacity-100">
                               <button
-                                className="text-gray-500 hover:text-blue-400"
+                                className="text-indigo-200/60 hover:text-indigo-300"
                                 onClick={(e) => { e.stopPropagation(); setAddingTopicFor(sub.id); }}
                                 title="Add topic"
                               >
                                 <Plus size={11} />
                               </button>
                               <button
-                                className="text-gray-500 hover:text-red-400"
+                                className="text-indigo-200/60 hover:text-red-300"
                                 onClick={(e) => { e.stopPropagation(); deleteSubject(sub.id); }}
                                 title="Delete subject"
                               >
@@ -241,7 +245,7 @@ export function Sidebar() {
                             >
                               <input
                                 autoFocus
-                                className="w-full bg-gray-700 text-white text-xs rounded px-2 py-1 outline-none"
+                                className="w-full bg-[#111d46] border border-[#29386b] text-white text-xs rounded px-2 py-1 outline-none"
                                 placeholder="Topic name..."
                                 value={newTopicName}
                                 onChange={(e) => setNewTopicName(e.target.value)}
@@ -255,16 +259,16 @@ export function Sidebar() {
                               {subTopics.map((topic) => (
                                 <div
                                   key={topic.id}
-                                  className="flex items-center gap-1 px-2 py-1 rounded cursor-pointer hover:bg-gray-700 group"
+                                  className="flex items-center gap-1 px-2 py-1 rounded cursor-pointer hover:bg-[#111d46] group"
                                   onClick={() => { selectTopic(topic.id); setActiveView('notes'); }}
                                 >
-                                  <FileText size={11} className="text-gray-500 flex-shrink-0" />
-                                  <span className="flex-1 text-xs truncate text-gray-300">{topic.name}</span>
-                                  <span className="text-xs text-gray-600 group-hover:hidden">
+                                  <FileText size={11} className="text-indigo-200/40 flex-shrink-0" />
+                                  <span className="flex-1 text-xs truncate text-indigo-100/90">{topic.name}</span>
+                                  <span className="text-xs text-indigo-200/40 group-hover:hidden">
                                     {topic.noteIds.length}
                                   </span>
                                   <button
-                                    className="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-400"
+                                    className="opacity-0 group-hover:opacity-100 text-indigo-200/50 hover:text-red-300"
                                     onClick={(e) => { e.stopPropagation(); deleteTopic(topic.id); }}
                                   >
                                     <Trash2 size={10} />
@@ -291,7 +295,7 @@ export function Sidebar() {
                       >
                         <input
                           autoFocus
-                          className="w-full bg-gray-700 text-white text-xs rounded px-2 py-1 outline-none"
+                          className="w-full bg-[#111d46] border border-[#29386b] text-white text-xs rounded px-2 py-1 outline-none"
                           placeholder="Subject name..."
                           value={newSubName}
                           onChange={(e) => setNewSubName(e.target.value)}
@@ -300,7 +304,7 @@ export function Sidebar() {
                       </form>
                     ) : (
                       <button
-                        className="flex items-center gap-1 px-2 py-1 text-xs text-gray-500 hover:text-gray-300 w-full"
+                        className="flex items-center gap-1 px-2 py-1 text-xs text-indigo-200/60 hover:text-indigo-100 w-full"
                         onClick={() => setAddingSubjectFor(nb.id)}
                       >
                         <Plus size={11} /> Add subject
@@ -315,8 +319,8 @@ export function Sidebar() {
       </div>
 
       {/* Footer */}
-      <div className="px-4 py-3 border-t border-gray-700 text-xs text-gray-500 text-center">
-        NoteIt MBBS v1.0
+      <div className="px-4 py-3 border-t border-[#223265] text-xs text-indigo-200/50 text-center">
+        Calm study mode · NoteIt MBBS
       </div>
     </aside>
   );
@@ -335,13 +339,13 @@ function NavItem({
     <button
       onClick={onClick}
       className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
-        active ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white'
+        active ? 'bg-indigo-500 text-white' : 'text-indigo-100/90 hover:bg-[#111d46] hover:text-white'
       }`}
     >
       {icon}
       <span className="flex-1 text-left">{label}</span>
       {badge && (
-        <span className="bg-orange-500 text-white text-xs px-1.5 py-0.5 rounded-full min-w-[20px] text-center">
+        <span className="bg-amber-500 text-white text-xs px-1.5 py-0.5 rounded-full min-w-[20px] text-center">
           {badge}
         </span>
       )}

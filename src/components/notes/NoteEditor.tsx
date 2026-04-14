@@ -21,6 +21,7 @@ import { HandwritingPad } from './HandwritingPad';
 import { NoteCanvasBoard } from './NoteCanvasBoard';
 import { AI_FLASHCARD_CARD_LIMIT, AI_QUIZ_CARD_LIMIT, AI_SUMMARY_POINT_LIMIT } from '@/lib/ai/constants';
 import { escapeHtml } from '@/lib/ai/text';
+import { FloatingToolbar, PillButton, SplitPane, TimelineRail } from '@/components/ui/primitives';
 
 type AIAction = 'summarize' | 'flashcards' | 'quiz' | 'diagram' | 'image-convert' | '3d';
 type GenerationModel = 'black-forest-labs/flux.2-klein-4b' | 'microsoft/trellis';
@@ -42,6 +43,7 @@ export function NoteEditor() {
   const [editingTitle, setEditingTitle] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
   const [splitMode, setSplitMode] = useState(false);
+  const [aiState, setAiState] = useState<'idle' | 'queued' | 'generating' | 'success' | 'fallback' | 'error'>('idle');
 
   const editor = useEditor(
     {
@@ -124,7 +126,9 @@ export function NoteEditor() {
     }
 
     setAiLoading(true);
+    setAiState('queued');
     try {
+      setAiState('generating');
       const response = await fetch('/api/ai', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -159,33 +163,38 @@ export function NoteEditor() {
         } | null;
       };
 
-      if (action === 'summarize') {
-        const points = (data.summaryPoints ?? []).filter(Boolean).slice(0, AI_SUMMARY_POINT_LIMIT);
-        if (points.length === 0) {
-          applyLocalFallback(action);
-          toast.success('Summary added (local fallback)');
-        } else {
-          const summaryHtml = `<h3>📝 AI Summary</h3><ul>${points.map((point) => `<li>${escapeHtml(point)}</li>`).join('')}</ul>`;
-          updateNote(note.id, { content: `${note.content}<hr>${summaryHtml}` });
-          toast.success('NVIDIA NIM summary added!');
-        }
-      } else if (action === 'flashcards' || action === 'quiz') {
+        if (action === 'summarize') {
+          const points = (data.summaryPoints ?? []).filter(Boolean).slice(0, AI_SUMMARY_POINT_LIMIT);
+          if (points.length === 0) {
+            applyLocalFallback(action);
+            setAiState('fallback');
+            toast.success('Summary added (local fallback)');
+          } else {
+            const summaryHtml = `<h3>📝 AI Summary</h3><ul>${points.map((point) => `<li>${escapeHtml(point)}</li>`).join('')}</ul>`;
+            updateNote(note.id, { content: `${note.content}<hr>${summaryHtml}` });
+            setAiState('success');
+            toast.success('NVIDIA NIM summary added!');
+          }
+        } else if (action === 'flashcards' || action === 'quiz') {
         const cards = (data.flashcards ?? [])
           .filter((c) => c.front && c.back)
           .slice(0, action === 'quiz' ? AI_QUIZ_CARD_LIMIT : AI_FLASHCARD_CARD_LIMIT);
-        if (cards.length === 0) {
-          applyLocalFallback(action);
-          toast.success(`${action === 'quiz' ? 'Quiz' : 'Flashcards'} generated (local fallback)`);
+          if (cards.length === 0) {
+            applyLocalFallback(action);
+            setAiState('fallback');
+            toast.success(`${action === 'quiz' ? 'Quiz' : 'Flashcards'} generated (local fallback)`);
+          } else {
+            cards.forEach((card) => addFlashcard(card.front, card.back, note.id, note.tags));
+            setAiState('success');
+            toast.success(`NVIDIA NIM ${action === 'quiz' ? 'quiz cards' : 'flashcards'} generated!`);
+          }
         } else {
-          cards.forEach((card) => addFlashcard(card.front, card.back, note.id, note.tags));
-          toast.success(`NVIDIA NIM ${action === 'quiz' ? 'quiz cards' : 'flashcards'} generated!`);
-        }
-      } else {
         const safePreview = toSafeUrl(data.generated?.previewImage);
         const safeAsset = toSafeUrl(data.generated?.assetUrl);
-        if (!safePreview && !safeAsset) {
-          toast.error('Generation completed but no preview URL was returned.');
-        } else {
+          if (!safePreview && !safeAsset) {
+            setAiState('fallback');
+            toast.error('Generation completed but no preview URL was returned.');
+          } else {
           const titleByAction: Record<'diagram' | 'image-convert' | '3d', string> = {
             diagram: '🖼️ AI Diagram/Photo Generation',
             'image-convert': '🎨 AI Image Conversion',
@@ -198,16 +207,19 @@ export function NoteEditor() {
             `<p><strong>Prompt:</strong> ${escapeHtml(prompt)}</p>`,
             safePreview ? `<p><img src="${escapeHtml(safePreview)}" alt="Generated output" /></p>` : '',
             safeAsset ? `<p><a href="${escapeHtml(safeAsset)}" target="_blank" rel="noreferrer">Open generated asset</a></p>` : '',
-          ].join('');
-          updateNote(note.id, { content: `${note.content}<hr>${resultHtml}` });
-          toast.success(action === '3d' ? 'Trellis 3D generation added to note!' : 'FLUX generation result added to note!');
+            ].join('');
+            updateNote(note.id, { content: `${note.content}<hr>${resultHtml}` });
+            setAiState('success');
+            toast.success(action === '3d' ? 'Trellis 3D generation added to note!' : 'FLUX generation result added to note!');
+          }
         }
-      }
     } catch {
       if (action === 'summarize' || action === 'flashcards' || action === 'quiz') {
         applyLocalFallback(action);
+        setAiState('fallback');
         toast.success(`${action === 'quiz' ? 'Quiz' : action === 'summarize' ? 'Summary' : 'Flashcards'} generated (local fallback)`);
       } else {
+        setAiState('error');
         toast.error('NVIDIA generation failed. Check API key and prompt/image input.');
       }
     }
@@ -235,11 +247,13 @@ export function NoteEditor() {
 
   const linkedNotes = notes.filter((n) => note.linkedNoteIds.includes(n.id));
   const unlinkableNotes = notes.filter((n) => n.id !== note.id && !note.linkedNoteIds.includes(n.id));
+  const hasSelection = Boolean(editor && !editor.state.selection.empty);
 
   return (
-    <div className="flex-1 flex flex-col bg-white overflow-hidden">
-      <div className="border-b border-gray-200 bg-white px-4 py-2 flex items-center gap-1 flex-wrap">
-        <ToolbarBtn onClick={() => editor?.chain().focus().toggleBold().run()} active={editor?.isActive('bold')} title="Bold">
+    <div className="flex-1 flex flex-col bg-[var(--surface)] overflow-hidden">
+      <div className="border-b border-[var(--border)] bg-[var(--surface)] px-4 py-3 space-y-2">
+        <FloatingToolbar>
+          <ToolbarBtn onClick={() => editor?.chain().focus().toggleBold().run()} active={editor?.isActive('bold')} title="Bold">
           <Bold size={15} />
         </ToolbarBtn>
         <ToolbarBtn onClick={() => editor?.chain().focus().toggleItalic().run()} active={editor?.isActive('italic')} title="Italic">
@@ -251,7 +265,7 @@ export function NoteEditor() {
         <ToolbarBtn onClick={() => editor?.chain().focus().toggleHighlight().run()} active={editor?.isActive('highlight')} title="Highlight">
           <Highlighter size={15} />
         </ToolbarBtn>
-        <div className="w-px h-5 bg-gray-200 mx-1" />
+        <div className="w-px h-5 bg-[var(--border)] mx-1" />
         <ToolbarBtn onClick={() => editor?.chain().focus().toggleHeading({ level: 1 }).run()} active={editor?.isActive('heading', { level: 1 })} title="H1">
           <Heading1 size={15} />
         </ToolbarBtn>
@@ -261,7 +275,7 @@ export function NoteEditor() {
         <ToolbarBtn onClick={() => editor?.chain().focus().toggleHeading({ level: 3 }).run()} active={editor?.isActive('heading', { level: 3 })} title="H3">
           <Heading3 size={15} />
         </ToolbarBtn>
-        <div className="w-px h-5 bg-gray-200 mx-1" />
+        <div className="w-px h-5 bg-[var(--border)] mx-1" />
         <ToolbarBtn onClick={() => editor?.chain().focus().toggleBulletList().run()} active={editor?.isActive('bulletList')} title="Bullet list">
           <List size={15} />
         </ToolbarBtn>
@@ -277,26 +291,26 @@ export function NoteEditor() {
         <ToolbarBtn onClick={() => editor?.chain().focus().setHorizontalRule().run()} title="Horizontal rule">
           <Minus size={15} />
         </ToolbarBtn>
-        <div className="w-px h-5 bg-gray-200 mx-1" />
+        <div className="w-px h-5 bg-[var(--border)] mx-1" />
 
         <div className="ml-auto flex items-center gap-1">
           <button
             onClick={() => setSplitMode((v) => !v)}
-            className={`p-1.5 rounded hover:bg-gray-100 ${splitMode ? 'text-indigo-600' : 'text-gray-400'}`}
+            className={`p-1.5 rounded hover:bg-[var(--surface-muted)] ${splitMode ? 'text-indigo-600' : 'text-[var(--text-muted)]'}`}
             title="Split-screen mode"
           >
             <PanelRightOpen size={15} />
           </button>
           <button
             onClick={() => toggleFavorite(note.id)}
-            className={`p-1.5 rounded hover:bg-gray-100 ${note.isFavorite ? 'text-yellow-500' : 'text-gray-400'}`}
+            className={`p-1.5 rounded hover:bg-[var(--surface-muted)] ${note.isFavorite ? 'text-yellow-500' : 'text-[var(--text-muted)]'}`}
             title="Toggle favorite"
           >
             <Star size={15} className={note.isFavorite ? 'fill-yellow-500' : ''} />
           </button>
           <button
             onClick={() => togglePin(note.id)}
-            className={`p-1.5 rounded hover:bg-gray-100 ${note.isPinned ? 'text-blue-600' : 'text-gray-400'}`}
+            className={`p-1.5 rounded hover:bg-[var(--surface-muted)] ${note.isPinned ? 'text-blue-600' : 'text-[var(--text-muted)]'}`}
             title="Toggle pin"
           >
             <Pin size={15} />
@@ -305,17 +319,17 @@ export function NoteEditor() {
           <div className="relative">
             <button
               onClick={() => setShowTagDropdown((v) => !v)}
-              className="p-1.5 rounded hover:bg-gray-100 text-gray-500"
+              className="p-1.5 rounded hover:bg-[var(--surface-muted)] text-[var(--text-muted)]"
               title="Tags"
             >
               <Tag size={15} />
             </button>
             {showTagDropdown && (
-              <div className="absolute right-0 top-full mt-1 w-52 bg-white border border-gray-200 rounded-xl shadow-lg z-50 p-2">
-                <p className="text-xs font-semibold text-gray-500 px-2 mb-1">Current tags</p>
+              <div className="absolute right-0 top-full mt-1 w-52 bg-white border border-[var(--border)] rounded-xl shadow-lg z-50 p-2">
+                <p className="text-xs font-semibold text-[var(--text-muted)] px-2 mb-1">Current tags</p>
                 <div className="flex flex-wrap gap-1 px-2 mb-2">
                   {note.tags.map((tag) => (
-                    <span key={tag} className="flex items-center gap-1 text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
+                    <span key={tag} className="flex items-center gap-1 text-xs bg-[var(--primary-100)] text-[var(--primary-600)] px-2 py-0.5 rounded-full">
                       {tag}
                       <button onClick={() => removeTagFromNote(note.id, tag)} className="hover:text-red-500">
                         <X size={10} />
@@ -323,13 +337,13 @@ export function NoteEditor() {
                     </span>
                   ))}
                 </div>
-                <p className="text-xs font-semibold text-gray-500 px-2 mb-1">Add tag</p>
+                <p className="text-xs font-semibold text-[var(--text-muted)] px-2 mb-1">Add tag</p>
                 <div className="max-h-32 overflow-y-auto">
                   {MEDICAL_TAGS.filter((t) => !note.tags.includes(t)).map((tag) => (
                     <button
                       key={tag}
                       onClick={() => addTagToNote(note.id, tag)}
-                      className="w-full text-left text-xs px-2 py-1 hover:bg-gray-100 rounded"
+                      className="w-full text-left text-xs px-2 py-1 hover:bg-[var(--surface-muted)] rounded"
                     >
                       {tag}
                     </button>
@@ -337,7 +351,7 @@ export function NoteEditor() {
                 </div>
                 <div className="flex gap-1 mt-2 px-2">
                   <input
-                    className="flex-1 text-xs border rounded px-2 py-1 outline-none"
+                    className="flex-1 text-xs border border-[var(--border)] rounded px-2 py-1 outline-none"
                     placeholder="Custom tag..."
                     value={customTag}
                     onChange={(e) => setCustomTag(e.target.value)}
@@ -356,30 +370,30 @@ export function NoteEditor() {
           <div className="relative">
             <button
               onClick={() => setShowLinkDropdown((v) => !v)}
-              className="p-1.5 rounded hover:bg-gray-100 text-gray-500"
+              className="p-1.5 rounded hover:bg-[var(--surface-muted)] text-[var(--text-muted)]"
               title="Link notes"
             >
               <LinkIcon size={15} />
             </button>
             {showLinkDropdown && (
-              <div className="absolute right-0 top-full mt-1 w-56 bg-white border border-gray-200 rounded-xl shadow-lg z-50 p-2">
-                <p className="text-xs font-semibold text-gray-500 px-2 mb-1">Linked notes</p>
+              <div className="absolute right-0 top-full mt-1 w-56 bg-white border border-[var(--border)] rounded-xl shadow-lg z-50 p-2">
+                <p className="text-xs font-semibold text-[var(--text-muted)] px-2 mb-1">Linked notes</p>
                 {linkedNotes.map((n) => (
-                  <div key={n.id} className="flex items-center justify-between px-2 py-1 hover:bg-gray-50 rounded">
-                    <span className="text-xs text-gray-700 truncate flex-1">{n.title}</span>
-                    <button onClick={() => unlinkNote(note.id, n.id)} className="text-gray-400 hover:text-red-400 ml-1">
+                  <div key={n.id} className="flex items-center justify-between px-2 py-1 hover:bg-[var(--surface-muted)] rounded">
+                    <span className="text-xs text-[var(--text-secondary)] truncate flex-1">{n.title}</span>
+                    <button onClick={() => unlinkNote(note.id, n.id)} className="text-[var(--text-muted)] hover:text-red-400 ml-1">
                       <X size={12} />
                     </button>
                   </div>
                 ))}
-                {linkedNotes.length === 0 && <p className="text-xs text-gray-400 px-2 mb-1">None</p>}
-                <p className="text-xs font-semibold text-gray-500 px-2 mt-2 mb-1">Link to</p>
+                {linkedNotes.length === 0 && <p className="text-xs text-[var(--text-muted)] px-2 mb-1">None</p>}
+                <p className="text-xs font-semibold text-[var(--text-muted)] px-2 mt-2 mb-1">Link to</p>
                 <div className="max-h-32 overflow-y-auto">
                   {unlinkableNotes.map((n) => (
                     <button
                       key={n.id}
                       onClick={() => linkNotes(note.id, n.id)}
-                      className="w-full text-left text-xs px-2 py-1 hover:bg-gray-100 rounded truncate"
+                      className="w-full text-left text-xs px-2 py-1 hover:bg-[var(--surface-muted)] rounded truncate"
                     >
                       + {n.title}
                     </button>
@@ -398,24 +412,24 @@ export function NoteEditor() {
               <Sparkles size={15} />
             </button>
             {showAiDropdown && (
-              <div className="absolute right-0 top-full mt-1 w-64 bg-white border border-gray-200 rounded-xl shadow-lg z-50 p-2">
-                <p className="text-[11px] text-gray-500 px-1 mb-2">Photo generation/editing model: FLUX.2-Klein-4B</p>
-                <button onClick={() => handleAI('summarize')} className="w-full text-left text-xs px-3 py-2 hover:bg-gray-100 rounded-lg flex items-center gap-2">
+              <div className="absolute right-0 top-full mt-1 w-64 bg-white border border-[var(--border)] rounded-xl shadow-lg z-50 p-2">
+                <p className="text-[11px] text-[var(--text-muted)] px-1 mb-2">Photo generation/editing model: FLUX.2-Klein-4B</p>
+                <button onClick={() => handleAI('summarize')} className="w-full text-left text-xs px-3 py-2 hover:bg-[var(--surface-muted)] rounded-lg flex items-center gap-2">
                   <AlignLeft size={12} /> Summarize note
                 </button>
-                <button onClick={() => handleAI('flashcards')} className="w-full text-left text-xs px-3 py-2 hover:bg-gray-100 rounded-lg flex items-center gap-2">
+                <button onClick={() => handleAI('flashcards')} className="w-full text-left text-xs px-3 py-2 hover:bg-[var(--surface-muted)] rounded-lg flex items-center gap-2">
                   <Brain size={12} /> Generate flashcards
                 </button>
-                <button onClick={() => handleAI('quiz')} className="w-full text-left text-xs px-3 py-2 hover:bg-gray-100 rounded-lg flex items-center gap-2">
+                <button onClick={() => handleAI('quiz')} className="w-full text-left text-xs px-3 py-2 hover:bg-[var(--surface-muted)] rounded-lg flex items-center gap-2">
                   <BookOpen size={12} /> Generate quiz
                 </button>
-                <button onClick={() => handleAI('diagram')} className="w-full text-left text-xs px-3 py-2 hover:bg-gray-100 rounded-lg flex items-center gap-2">
+                <button onClick={() => handleAI('diagram')} className="w-full text-left text-xs px-3 py-2 hover:bg-[var(--surface-muted)] rounded-lg flex items-center gap-2">
                   <Sparkles size={12} /> Generate diagram/photo
                 </button>
-                <button onClick={() => handleAI('image-convert')} className="w-full text-left text-xs px-3 py-2 hover:bg-gray-100 rounded-lg flex items-center gap-2">
+                <button onClick={() => handleAI('image-convert')} className="w-full text-left text-xs px-3 py-2 hover:bg-[var(--surface-muted)] rounded-lg flex items-center gap-2">
                   <Sparkles size={12} /> Convert photo style (anime/Ghibli)
                 </button>
-                <button onClick={() => handleAI('3d')} className="w-full text-left text-xs px-3 py-2 hover:bg-gray-100 rounded-lg flex items-center gap-2">
+                <button onClick={() => handleAI('3d')} className="w-full text-left text-xs px-3 py-2 hover:bg-[var(--surface-muted)] rounded-lg flex items-center gap-2">
                   <Sparkles size={12} /> Generate 3D model (Trellis)
                 </button>
               </div>
@@ -424,19 +438,38 @@ export function NoteEditor() {
 
           <button
             onClick={() => { deleteNote(note.id); selectNote(null); }}
-            className="p-1.5 rounded hover:bg-red-50 text-gray-400 hover:text-red-500"
+            className="p-1.5 rounded hover:bg-red-50 text-[var(--text-muted)] hover:text-red-500"
             title="Delete note"
           >
             <Trash2 size={15} />
           </button>
         </div>
+        </FloatingToolbar>
+
+        {(hasSelection || aiLoading || aiState !== 'idle') && (
+          <div className="flex flex-wrap items-center gap-2 px-1 text-xs">
+            {hasSelection && (
+              <>
+                <span className="chip chip-active">Create from selection</span>
+                <PillButton onClick={() => handleAI('flashcards')}>Flashcard</PillButton>
+                <PillButton onClick={() => handleAI('summarize')}>Summary</PillButton>
+                <PillButton onClick={() => handleAI('quiz')}>Quiz</PillButton>
+              </>
+            )}
+            {(aiLoading || aiState !== 'idle') && (
+              <span className={`chip ${aiState === 'success' ? 'chip-active' : ''}`}>
+                AI status: {aiLoading ? 'generating' : aiState}
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
-      <div className="px-6 pt-4 pb-2 border-b border-gray-100">
+      <div className="px-6 pt-4 pb-2 border-b border-[var(--border)] bg-[var(--surface)]">
         {editingTitle ? (
           <input
             autoFocus
-            className="text-2xl font-bold text-gray-800 w-full outline-none border-b-2 border-blue-500 pb-1 bg-transparent"
+            className="text-2xl font-semibold text-[var(--text-primary)] w-full outline-none border-b-2 border-[var(--primary-500)] pb-1 bg-transparent"
             value={note.title}
             onChange={(e) => updateNote(note.id, { title: e.target.value })}
             onBlur={() => setEditingTitle(false)}
@@ -444,37 +477,55 @@ export function NoteEditor() {
           />
         ) : (
           <h1
-            className="text-2xl font-bold text-gray-800 cursor-text hover:bg-gray-50 rounded px-1 -mx-1 py-0.5"
+            className="text-2xl font-semibold text-[var(--text-primary)] cursor-text hover:bg-[var(--surface-muted)] rounded px-1 -mx-1 py-0.5"
             onClick={() => setEditingTitle(true)}
           >
             {note.title}
           </h1>
         )}
         <div className="flex items-center gap-3 mt-1 flex-wrap">
-          <span className="text-xs text-gray-400">Updated {formatDate(note.updatedAt)}</span>
-          <span className="text-xs text-gray-500">Docs {note.attachments.length}</span>
-          <span className="text-xs text-gray-500">Drawings {note.drawings.length}</span>
+          <span className="text-xs text-[var(--text-muted)]">Updated {formatDate(note.updatedAt)}</span>
+          <span className="text-xs text-[var(--text-secondary)]">Docs {note.attachments.length}</span>
+          <span className="text-xs text-[var(--text-secondary)]">Drawings {note.drawings.length}</span>
           {note.handwritingIndex && <span className="text-xs text-indigo-600">OCR indexed</span>}
           <div className="flex gap-1 flex-wrap">
             {note.tags.map((tag) => (
-              <span key={tag} className="text-xs bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full">{tag}</span>
+              <span key={tag} className="text-xs bg-[var(--primary-100)] text-[var(--primary-600)] px-2 py-0.5 rounded-full">{tag}</span>
             ))}
           </div>
           {note.linkedNoteIds.length > 0 && (
-            <span className="text-xs text-gray-400">🔗 {note.linkedNoteIds.length} linked</span>
+            <span className="text-xs text-[var(--text-muted)]">🔗 {note.linkedNoteIds.length} linked</span>
           )}
         </div>
       </div>
 
-      <div className="flex-1 overflow-hidden flex">
-        <div className={`overflow-y-auto px-6 py-4 ${splitMode ? 'w-[60%]' : 'w-full'}`}>
-          <EditorContent editor={editor} />
-          <NoteCanvasBoard note={note} />
-          <div className="mt-6">
-            <HandwritingPad note={note} />
-          </div>
+      {note.audioUrl && (
+        <div className="px-6 py-2 bg-[var(--surface-muted)] border-b border-[var(--border)]">
+          <TimelineRail className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
+              <span className="h-2 w-2 rounded-full bg-[var(--danger-600)] animate-pulse" />
+              REC linked to note timeline
+            </div>
+            <span className="text-xs text-[var(--text-muted)]">{note.audioTimestamps.length} timestamp marker(s)</span>
+          </TimelineRail>
         </div>
-        {splitMode && <DocumentWorkspace note={note} compact />}
+      )}
+
+      <div className="flex-1 overflow-hidden px-3 py-3">
+        <SplitPane
+          leftClassName={`overflow-y-auto rounded-2xl border border-[var(--border)] bg-white px-6 py-4 ${splitMode ? '' : 'col-span-2'}`}
+          rightClassName={splitMode ? 'min-h-0' : 'hidden'}
+          left={(
+            <>
+              <EditorContent editor={editor} />
+              <NoteCanvasBoard note={note} />
+              <div className="mt-6">
+                <HandwritingPad note={note} />
+              </div>
+            </>
+          )}
+          right={splitMode ? <DocumentWorkspace note={note} compact /> : <></>}
+        />
       </div>
     </div>
   );
@@ -492,7 +543,7 @@ function ToolbarBtn({
     <button
       onClick={onClick}
       title={title}
-      className={`p-1.5 rounded hover:bg-gray-100 ${active ? 'bg-gray-200 text-gray-900' : 'text-gray-600'}`}
+      className={`p-1.5 rounded hover:bg-[var(--surface-muted)] ${active ? 'bg-[var(--primary-100)] text-[var(--primary-600)]' : 'text-[var(--text-secondary)]'}`}
     >
       {children}
     </button>

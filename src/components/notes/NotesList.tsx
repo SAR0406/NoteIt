@@ -81,27 +81,27 @@ export function NotesList() {
   };
 
   return (
-    <div className="w-72 bg-gray-50 border-r border-gray-200 flex flex-col h-screen overflow-hidden flex-shrink-0">
-      <div className="px-4 py-3 border-b border-gray-200 bg-white">
+    <div className="w-72 bg-[var(--surface-muted)] border-r border-[var(--border)] flex flex-col h-screen overflow-hidden flex-shrink-0">
+      <div className="px-4 py-3 border-b border-[var(--border)] bg-white">
         <div className="flex items-center justify-between">
-          <h2 className="font-semibold text-gray-800 truncate">{getHeaderTitle()}</h2>
+          <h2 className="font-semibold text-[var(--text-primary)] truncate">{getHeaderTitle()}</h2>
           <button
             onClick={handleAddNote}
-            className="p-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            className="p-1.5 bg-[var(--primary-600)] text-white rounded-lg hover:bg-[var(--primary-500)]"
             title="New note"
           >
             <Plus size={16} />
           </button>
         </div>
-        <p className="text-xs text-gray-500 mt-0.5">{filtered.length} note{filtered.length !== 1 ? 's' : ''}</p>
+        <p className="text-xs text-[var(--text-secondary)] mt-0.5">{filtered.length} note{filtered.length !== 1 ? 's' : ''}</p>
       </div>
 
       <div className="flex-1 overflow-y-auto">
         {filtered.length === 0 && (
-          <div className="flex flex-col items-center justify-center h-48 text-gray-400">
+          <div className="flex flex-col items-center justify-center h-48 text-[var(--text-muted)]">
             <Edit3 size={32} className="mb-2 opacity-40" />
             <p className="text-sm">No notes found</p>
-            <button onClick={handleAddNote} className="mt-2 text-blue-600 text-sm hover:underline">
+            <button onClick={handleAddNote} className="mt-2 text-[var(--primary-600)] text-sm hover:underline">
               Create one
             </button>
           </div>
@@ -109,7 +109,7 @@ export function NotesList() {
 
         {pinned.length > 0 && (
           <div>
-            <p className="px-4 py-1 text-xs font-semibold text-gray-400 uppercase bg-gray-100">📌 Pinned</p>
+            <p className="px-4 py-1 text-xs font-semibold text-[var(--text-muted)] uppercase bg-[var(--surface-accent)]">📌 Pinned</p>
             {pinned.map((note) => (
               <NoteCard key={note.id} note={note} context={getContext(note)} selected={note.id === selectedNoteId} onClick={() => { selectNote(note.id); setActiveView('note-editor'); }} />
             ))}
@@ -118,7 +118,7 @@ export function NotesList() {
 
         {rest.length > 0 && (
           <div>
-            {pinned.length > 0 && <p className="px-4 py-1 text-xs font-semibold text-gray-400 uppercase bg-gray-100">Notes</p>}
+            {pinned.length > 0 && <p className="px-4 py-1 text-xs font-semibold text-[var(--text-muted)] uppercase bg-[var(--surface-accent)]">Notes</p>}
             {rest.map((note) => (
               <NoteCard key={note.id} note={note} context={getContext(note)} selected={note.id === selectedNoteId} onClick={() => { selectNote(note.id); setActiveView('note-editor'); }} />
             ))}
@@ -134,28 +134,28 @@ function NoteCard({ note, context, selected, onClick }: { note: Note; context: s
   return (
     <div
       onClick={onClick}
-      className={`px-4 py-3 border-b border-gray-100 cursor-pointer hover:bg-blue-50 transition-colors ${
-        selected ? 'bg-blue-50 border-l-2 border-l-blue-500' : ''
+      className={`px-4 py-3 border-b border-[var(--border)] cursor-pointer hover:bg-[var(--surface-accent)] transition-colors ${
+        selected ? 'bg-[var(--surface-accent)] border-l-2 border-l-[var(--primary-500)]' : ''
       }`}
     >
       <div className="flex items-start gap-2">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1">
             {note.isFavorite && <Star size={11} className="text-yellow-500 fill-yellow-500 flex-shrink-0" />}
-            <h3 className="text-sm font-medium text-gray-800 truncate">{note.title}</h3>
+            <h3 className="text-sm font-medium text-[var(--text-primary)] truncate">{note.title}</h3>
           </div>
-          {context && <p className="text-xs text-blue-600 mt-0.5 truncate">{context}</p>}
-          {preview && <p className="text-xs text-gray-500 mt-1 line-clamp-2">{preview}</p>}
+          {context && <p className="text-xs text-[var(--primary-600)] mt-0.5 truncate">{context}</p>}
+          {preview && <p className="text-xs text-[var(--text-secondary)] mt-1 line-clamp-2">{preview}</p>}
           <div className="flex items-center gap-2 mt-1.5">
-            <span className="text-xs text-gray-400">{formatDate(note.updatedAt)}</span>
+            <span className="text-xs text-[var(--text-muted)]">{formatDate(note.updatedAt)}</span>
             <div className="flex gap-1 flex-wrap">
               {note.tags.slice(0, 2).map((tag) => (
-                <span key={tag} className="text-xs bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full">
+                <span key={tag} className="text-xs bg-[var(--primary-100)] text-[var(--primary-600)] px-1.5 py-0.5 rounded-full">
                   {tag}
                 </span>
               ))}
               {note.tags.length > 2 && (
-                <span className="text-xs text-gray-400">+{note.tags.length - 2}</span>
+                <span className="text-xs text-[var(--text-muted)]">+{note.tags.length - 2}</span>
               )}
             </div>
           </div>

@@ -2,6 +2,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from '@/store/useStore';
 import { Link2, ZoomIn, ZoomOut } from 'lucide-react';
+import { SegmentedControl } from '@/components/ui/primitives';
 
 interface NodePos {
   x: number;
@@ -17,6 +18,7 @@ export function GraphView() {
   const [dragging, setDragging] = useState<string | null>(null);
   const [panStart, setPanStart] = useState<{ x: number; y: number } | null>(null);
   const [hoveredNote, setHoveredNote] = useState<string | null>(null);
+  const [mode, setMode] = useState<'graph' | 'mind-map'>('graph');
 
   const nodePositions = useMemo(() => {
     const mapped: Record<string, NodePos> = {};
@@ -50,24 +52,25 @@ export function GraphView() {
     ctx.scale(scale, scale);
 
     // Draw edges
-    notes.forEach((note) => {
-      note.linkedNoteIds.forEach((linkedId) => {
-        const from = nodePositions[note.id];
-        const to = nodePositions[linkedId];
-        if (!from || !to) return;
-        ctx.beginPath();
-        ctx.moveTo(from.x, from.y);
-        ctx.lineTo(to.x, to.y);
-        ctx.strokeStyle = '#93c5fd';
-        ctx.lineWidth = 2;
-        ctx.stroke();
-      });
+      notes.forEach((note) => {
+        note.linkedNoteIds.forEach((linkedId) => {
+          const from = nodePositions[note.id];
+          const to = nodePositions[linkedId];
+          if (!from || !to) return;
+          ctx.beginPath();
+          ctx.moveTo(from.x, from.y);
+          ctx.lineTo(to.x, to.y);
+          const isPharma = note.tags.some((tag) => tag.toLowerCase().includes('pharma'));
+          ctx.strokeStyle = isPharma ? '#c4b5fd' : '#93c5fd';
+          ctx.lineWidth = 2;
+          ctx.stroke();
+        });
     });
 
     // Draw nodes
-    notes.forEach((note) => {
-      const pos = nodePositions[note.id];
-      if (!pos) return;
+      notes.forEach((note) => {
+        const pos = nodePositions[note.id];
+        if (!pos) return;
 
       const isHovered = hoveredNote === note.id;
       const nodeRadius = note.isPinned ? 24 : 18;
@@ -75,8 +78,9 @@ export function GraphView() {
       // Node circle
       ctx.beginPath();
       ctx.arc(pos.x, pos.y, nodeRadius, 0, 2 * Math.PI);
-      ctx.fillStyle = isHovered ? '#3b82f6' : note.isFavorite ? '#f59e0b' : '#60a5fa';
-      ctx.fill();
+        const isPharma = note.tags.some((tag) => tag.toLowerCase().includes('pharma'));
+        ctx.fillStyle = isHovered ? '#3b82f6' : note.isFavorite ? '#f59e0b' : isPharma ? '#a78bfa' : '#60a5fa';
+        ctx.fill();
       ctx.strokeStyle = '#1d4ed8';
       ctx.lineWidth = 2;
       ctx.stroke();
@@ -150,54 +154,99 @@ export function GraphView() {
     setPanStart(null);
   };
 
+  const root = notes[0];
+
   return (
-    <div className="flex-1 flex flex-col bg-gray-50">
-      <div className="flex items-center justify-between px-6 py-3 border-b border-gray-200 bg-white">
-        <h1 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-          <Link2 className="text-blue-500" size={22} /> Note Graph
+    <div className="flex-1 flex flex-col app-bg">
+      <div className="flex items-center justify-between px-6 py-3 border-b border-[var(--border)] bg-white">
+        <h1 className="text-xl font-semibold text-[var(--text-primary)] flex items-center gap-2">
+          <Link2 className="text-[var(--primary-600)]" size={22} /> Knowledge View
         </h1>
-        <div className="flex items-center gap-2 text-sm text-gray-500">
-          <span>{notes.length} notes</span>
-          <span>·</span>
-          <span>{notes.reduce((acc, n) => acc + n.linkedNoteIds.length, 0) / 2} connections</span>
-          <div className="flex items-center gap-1 ml-2">
-            <button onClick={() => setScale((s) => Math.min(s + 0.2, 3))} className="p-1.5 rounded hover:bg-gray-100">
-              <ZoomIn size={16} />
-            </button>
-            <button onClick={() => setScale((s) => Math.max(s - 0.2, 0.3))} className="p-1.5 rounded hover:bg-gray-100">
-              <ZoomOut size={16} />
-            </button>
-            <button onClick={() => { setScale(1); setOffset({ x: 0, y: 0 }); }} className="px-2 py-1 text-xs bg-gray-100 rounded hover:bg-gray-200">
-              Reset
-            </button>
-          </div>
+        <div className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+          <SegmentedControl
+            value={mode}
+            options={[
+              { label: 'Graph', value: 'graph' },
+              { label: 'Mind map', value: 'mind-map' },
+            ]}
+            onChange={(next) => setMode(next as 'graph' | 'mind-map')}
+          />
+          {mode === 'graph' && (
+            <div className="flex items-center gap-1 ml-2">
+              <button onClick={() => setScale((s) => Math.min(s + 0.2, 3))} className="p-1.5 rounded hover:bg-[var(--surface-muted)]">
+                <ZoomIn size={16} />
+              </button>
+              <button onClick={() => setScale((s) => Math.max(s - 0.2, 0.3))} className="p-1.5 rounded hover:bg-[var(--surface-muted)]">
+                <ZoomOut size={16} />
+              </button>
+              <button onClick={() => { setScale(1); setOffset({ x: 0, y: 0 }); }} className="pill-button">
+                Reset
+              </button>
+            </div>
+          )}
         </div>
       </div>
-      <div className="flex-1 relative">
-        <canvas
-          ref={canvasRef}
-          width={800}
-          height={600}
-          className="w-full h-full"
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseUp}
-        />
-        {notes.length === 0 && (
-          <div className="absolute inset-0 flex items-center justify-center text-gray-400">
-            <div className="text-center">
-              <Link2 size={48} className="mx-auto mb-3 opacity-30" />
-              <p>No notes to display. Create some notes and link them!</p>
+
+      <div className="flex-1 relative p-4">
+        {mode === 'graph' ? (
+          <>
+            <canvas
+              ref={canvasRef}
+              width={800}
+              height={600}
+              className="w-full h-full rounded-2xl border border-[var(--border)] bg-white"
+              onMouseDown={handleMouseDown}
+              onMouseMove={handleMouseMove}
+              onMouseUp={handleMouseUp}
+              onMouseLeave={handleMouseUp}
+            />
+            {notes.length === 0 && (
+              <div className="absolute inset-0 flex items-center justify-center text-[var(--text-muted)]">
+                <div className="text-center">
+                  <Link2 size={48} className="mx-auto mb-3 opacity-30" />
+                  <p>No notes to display. Create some notes and link them!</p>
+                </div>
+              </div>
+            )}
+            <div className="absolute bottom-8 left-8 surface-card rounded-lg p-3 text-xs text-[var(--text-secondary)] space-y-1">
+              <p>🔵 Core topic</p>
+              <p>🟣 Pharmacology</p>
+              <p>🟡 Favorite</p>
+              <p className="text-[var(--text-muted)]">Drag to move · Click to open · Pan to explore</p>
             </div>
+          </>
+        ) : (
+          <div className="surface-card h-full rounded-2xl p-6 overflow-y-auto">
+            <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-3">Mind Map</h2>
+            {root ? (
+              <div className="space-y-2">
+                <div className="rounded-xl bg-[var(--primary-100)] px-3 py-2 text-sm font-semibold text-[var(--primary-600)] inline-block">
+                  {root.title}
+                </div>
+                <div className="pl-5 space-y-2">
+                  {root.linkedNoteIds.map((id) => {
+                    const linked = notes.find((n) => n.id === id);
+                    if (!linked) return null;
+                    return (
+                      <button
+                        key={id}
+                        onClick={() => {
+                          selectNote(id);
+                          setActiveView('note-editor');
+                        }}
+                        className="block rounded-lg border border-[var(--border)] px-3 py-2 text-left text-sm text-[var(--text-secondary)] hover:border-[var(--border-strong)]"
+                      >
+                        {linked.title}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-[var(--text-muted)]">No notes available yet.</p>
+            )}
           </div>
         )}
-        <div className="absolute bottom-4 left-4 bg-white rounded-lg shadow-md p-3 text-xs text-gray-500 space-y-1">
-          <p>🔵 Normal note</p>
-          <p>🟡 Favorite</p>
-          <p>⭕ Pinned (larger)</p>
-          <p className="text-gray-400">Drag to move · Click to open · Scroll to zoom</p>
-        </div>
       </div>
     </div>
   );

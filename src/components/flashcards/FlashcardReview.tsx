@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { useStore } from '@/store/useStore';
 import { Brain, X, CheckCircle } from 'lucide-react';
 import { isDue } from '@/lib/utils';
+import { PillButton, SectionCard } from '@/components/ui/primitives';
 
 export function FlashcardReview() {
   const { flashcards, reviewFlashcard, setActiveView } = useStore();
@@ -15,20 +16,20 @@ export function FlashcardReview() {
 
   if (sessionCards.length === 0 || done) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center bg-gray-50 text-center px-4">
-        <CheckCircle size={64} className="text-green-500 mb-4" />
-        <h2 className="text-2xl font-bold text-gray-800 mb-2">Session Complete! 🎉</h2>
-        <p className="text-gray-500 mb-6">
+      <div className="flex-1 flex flex-col items-center justify-center app-bg text-center px-4">
+        <CheckCircle size={64} className="text-[var(--success-600)] mb-4" />
+        <h2 className="text-2xl font-semibold text-[var(--text-primary)] mb-2">Session Complete! 🎉</h2>
+        <p className="text-[var(--text-secondary)] mb-6">
           {sessionCards.length === 0
             ? 'No cards due right now. Come back later!'
             : `You reviewed ${sessionCards.length} card${sessionCards.length !== 1 ? 's' : ''}!`}
         </p>
-        <button
+        <PillButton
           onClick={() => setActiveView('flashcards')}
-          className="px-6 py-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 font-medium"
+          className="pill-button-active"
         >
           Back to Flashcards
-        </button>
+        </PillButton>
       </div>
     );
   }
@@ -50,48 +51,48 @@ export function FlashcardReview() {
   };
 
   return (
-    <div className="flex-1 flex flex-col bg-gray-50 p-6">
+    <div className="flex-1 flex flex-col app-bg p-6">
       <div className="max-w-2xl mx-auto w-full flex flex-col flex-1">
         {/* Header */}
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="font-bold text-gray-700 flex items-center gap-2">
-            <Brain className="text-purple-500" size={20} /> Review Session
+        <div className="surface-card-accent rounded-2xl px-4 py-3 mb-4 flex items-center justify-between">
+          <h2 className="font-semibold text-[var(--text-primary)] flex items-center gap-2">
+            <Brain className="text-[var(--accent-600)]" size={20} /> Review Session
           </h2>
-          <button onClick={() => setActiveView('flashcards')} className="text-gray-400 hover:text-gray-600">
+          <button onClick={() => setActiveView('flashcards')} className="text-[var(--text-muted)] hover:text-[var(--text-primary)]">
             <X size={20} />
           </button>
         </div>
 
         {/* Progress */}
-        <div className="mb-6">
-          <div className="flex justify-between text-xs text-gray-500 mb-1">
+        <SectionCard title="Session Progress" subtitle="Stay calm and rate honestly" className="mb-6">
+          <div className="flex justify-between text-xs text-[var(--text-secondary)] mb-1">
             <span>{currentIdx + 1} / {sessionCards.length}</span>
-            <span>{Math.round(progress * 100)}% done</span>
+            <span>{Math.round(progress * 100)}% done · {sessionCards.length - currentIdx - 1} remaining</span>
           </div>
-          <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+          <div className="h-2 bg-[var(--primary-100)] rounded-full overflow-hidden">
             <div
-              className="h-full bg-purple-500 rounded-full transition-all duration-500"
+              className="h-full bg-[var(--primary-500)] rounded-full transition-all duration-500"
               style={{ width: `${progress * 100}%` }}
             />
           </div>
-        </div>
+        </SectionCard>
 
         {/* Card */}
         <div className="flex-1 flex flex-col">
-          <div className="bg-white rounded-2xl shadow-md border border-gray-200 p-8 text-center mb-6 flex-1 flex flex-col items-center justify-center min-h-[200px]">
+          <div className="surface-card rounded-2xl p-8 text-center mb-6 flex-1 flex flex-col items-center justify-center min-h-[200px]">
             {card.tags.length > 0 && (
               <div className="flex gap-1 mb-4">
                 {card.tags.map((t) => (
-                  <span key={t} className="text-xs bg-purple-100 text-purple-600 px-2 py-0.5 rounded-full">{t}</span>
+                  <span key={t} className="chip chip-active">{t}</span>
                 ))}
               </div>
             )}
-            <p className="text-lg font-semibold text-gray-800 mb-4">{card.front}</p>
+            <p className="text-lg font-semibold text-[var(--text-primary)] mb-4">{card.front}</p>
 
             {revealed && (
-              <div className="mt-4 pt-4 border-t border-gray-100 w-full">
-                <p className="text-xs font-semibold text-purple-500 mb-2 uppercase">Answer</p>
-                <p className="text-gray-700">{card.back}</p>
+              <div className="mt-4 pt-4 border-t border-[var(--border)] w-full">
+                <p className="text-xs font-semibold text-[var(--accent-600)] mb-2 uppercase">Answer</p>
+                <p className="text-[var(--text-secondary)]">{card.back}</p>
               </div>
             )}
           </div>
@@ -100,22 +101,22 @@ export function FlashcardReview() {
           {!revealed ? (
             <button
               onClick={() => setRevealed(true)}
-              className="w-full py-4 bg-gray-800 text-white rounded-xl hover:bg-gray-700 font-medium text-lg"
+              className="w-full py-4 bg-[var(--text-primary)] text-white rounded-xl hover:bg-[#1f2937] font-medium text-lg"
             >
               Reveal Answer
             </button>
           ) : (
             <div className="grid grid-cols-4 gap-3">
               {[
-                { label: 'Again', difficulty: 'again' as const, color: 'bg-red-500 hover:bg-red-600', emoji: '🔁' },
-                { label: 'Hard', difficulty: 'hard' as const, color: 'bg-orange-500 hover:bg-orange-600', emoji: '😓' },
-                { label: 'Good', difficulty: 'good' as const, color: 'bg-blue-500 hover:bg-blue-600', emoji: '👍' },
-                { label: 'Easy', difficulty: 'easy' as const, color: 'bg-green-500 hover:bg-green-600', emoji: '⚡' },
+                { label: 'Again', difficulty: 'again' as const, color: 'bg-[#eef2ff] text-[#334155] hover:bg-[#e2e8f0]', emoji: '🔁' },
+                { label: 'Hard', difficulty: 'hard' as const, color: 'bg-[#f8fafc] text-[#334155] hover:bg-[#eef2ff]', emoji: '😓' },
+                { label: 'Good', difficulty: 'good' as const, color: 'bg-[#eaf7ff] text-[#1d4ed8] hover:bg-[#dbeafe]', emoji: '👍' },
+                { label: 'Easy', difficulty: 'easy' as const, color: 'bg-[#e8fbf5] text-[#0f766e] hover:bg-[#d1fae5]', emoji: '⚡' },
               ].map(({ label, difficulty, color, emoji }) => (
                 <button
                   key={difficulty}
                   onClick={() => handleRate(difficulty)}
-                  className={`${color} text-white rounded-xl py-3 font-medium flex flex-col items-center gap-1`}
+                  className={`${color} rounded-xl py-3 font-medium flex flex-col items-center gap-1 border border-[var(--border)]`}
                 >
                   <span>{emoji}</span>
                   <span className="text-sm">{label}</span>

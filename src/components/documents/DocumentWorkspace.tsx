@@ -1,9 +1,10 @@
 'use client';
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { FileUp, FileText, Trash2, Save, Eraser, ZoomIn, ZoomOut } from 'lucide-react';
+import { FileUp, FileText, Trash2, Save, Eraser, ZoomIn, ZoomOut, Brain, Sparkles } from 'lucide-react';
 import { Note, NoteAttachment } from '@/types';
 import { useStore } from '@/store/useStore';
+import toast from 'react-hot-toast';
 
 interface Props {
   note: Note;
@@ -125,12 +126,32 @@ export function DocumentWorkspace({ note, compact = false }: Props) {
     });
   };
 
+  const runSmartAction = (action: 'flashcard' | 'summary' | 'insert') => {
+    if (!selectedAttachment?.indexedText.trim()) {
+      toast.error('Add indexed text first to run smart actions.');
+      return;
+    }
+    const indexed = selectedAttachment.indexedText.trim();
+    if (action === 'insert') {
+      updateNote(note.id, { content: `${note.content}<hr><p>${indexed}</p>` });
+      toast.success('Indexed text added to note.');
+      return;
+    }
+    if (action === 'summary') {
+      updateNote(note.id, { content: `${note.content}<hr><h3>📄 PDF Summary</h3><p>${indexed}</p>` });
+      toast.success('Summary block added to note.');
+      return;
+    }
+    updateNote(note.id, { content: `${note.content}<hr><p><strong>Flashcard seed:</strong> ${indexed}</p>` });
+    toast.success('Flashcard seed inserted in note.');
+  };
+
   return (
-    <div className={`bg-gray-50 border-l border-gray-200 ${compact ? 'w-[40%] min-w-[360px]' : 'flex-1'} flex flex-col`}>
-      <div className="px-4 py-3 border-b border-gray-200 bg-white">
+    <div className={`bg-[var(--surface-muted)] border-l border-[var(--border)] ${compact ? 'w-[40%] min-w-[360px]' : 'flex-1'} flex flex-col rounded-2xl`}>
+      <div className="px-4 py-3 border-b border-[var(--border)] bg-white">
         <div className="flex items-center justify-between">
-          <h3 className="font-semibold text-gray-700">PDF / Slide Workspace</h3>
-          <label className="inline-flex items-center gap-2 text-xs px-3 py-1.5 rounded-lg bg-blue-600 text-white cursor-pointer hover:bg-blue-700">
+          <h3 className="font-semibold text-[var(--text-primary)]">PDF / Slide Workspace</h3>
+          <label className="inline-flex items-center gap-2 text-xs px-3 py-1.5 rounded-full bg-[var(--primary-600)] text-white cursor-pointer hover:bg-[var(--primary-500)]">
             <FileUp size={14} />
             Import PDF/Slide
             <input
@@ -143,9 +164,9 @@ export function DocumentWorkspace({ note, compact = false }: Props) {
         </div>
       </div>
 
-      <div className="px-3 py-2 border-b border-gray-200 bg-white flex items-center gap-2 overflow-x-auto">
+      <div className="px-3 py-2 border-b border-[var(--border)] bg-white flex items-center gap-2 overflow-x-auto">
         {note.attachments.length === 0 && (
-          <p className="text-xs text-gray-400">No documents yet. Import lecture slides or PDFs.</p>
+          <p className="text-xs text-[var(--text-muted)]">No documents yet. Import lecture slides or PDFs.</p>
         )}
         {note.attachments.map((attachment) => (
           <button
@@ -153,8 +174,8 @@ export function DocumentWorkspace({ note, compact = false }: Props) {
             onClick={() => setSelectedAttachmentId(attachment.id)}
             className={`text-xs px-2 py-1 rounded border whitespace-nowrap ${
               selectedAttachmentId === attachment.id
-                ? 'bg-blue-100 border-blue-300 text-blue-700'
-                : 'bg-white border-gray-200 text-gray-600'
+                ? 'bg-[var(--primary-100)] border-[var(--border-strong)] text-[var(--primary-600)]'
+                : 'bg-white border-[var(--border)] text-[var(--text-secondary)]'
             }`}
           >
             {attachment.name}
@@ -164,42 +185,42 @@ export function DocumentWorkspace({ note, compact = false }: Props) {
 
       {selectedAttachment ? (
         <div className="flex-1 flex flex-col overflow-hidden">
-          <div className="px-3 py-2 bg-white border-b border-gray-200 flex items-center gap-2">
-            <button
-              onClick={() => setZoom((z) => Math.max(0.6, z - 0.1))}
-              className="p-1.5 rounded hover:bg-gray-100 text-gray-600"
-              title="Zoom out"
-            >
+            <div className="px-3 py-2 bg-white border-b border-[var(--border)] flex items-center gap-2">
+              <button
+                onClick={() => setZoom((z) => Math.max(0.6, z - 0.1))}
+                className="p-1.5 rounded hover:bg-[var(--surface-muted)] text-[var(--text-secondary)]"
+                title="Zoom out"
+              >
               <ZoomOut size={14} />
             </button>
-            <button
-              onClick={() => setZoom((z) => Math.min(2.2, z + 0.1))}
-              className="p-1.5 rounded hover:bg-gray-100 text-gray-600"
-              title="Zoom in"
-            >
+              <button
+                onClick={() => setZoom((z) => Math.min(2.2, z + 0.1))}
+                className="p-1.5 rounded hover:bg-[var(--surface-muted)] text-[var(--text-secondary)]"
+                title="Zoom in"
+              >
               <ZoomIn size={14} />
             </button>
-            <span className="text-xs text-gray-500">{Math.round(zoom * 100)}%</span>
-            <div className="ml-auto flex items-center gap-1">
-              <button onClick={clearOverlay} className="p-1.5 rounded hover:bg-gray-100 text-gray-600" title="Clear annotation">
-                <Eraser size={14} />
-              </button>
-              <button onClick={saveOverlay} className="p-1.5 rounded hover:bg-gray-100 text-green-700" title="Save annotation">
-                <Save size={14} />
-              </button>
-              <button
-                onClick={() => removeAttachmentFromNote(note.id, selectedAttachment.id)}
-                className="p-1.5 rounded hover:bg-red-50 text-red-500"
-                title="Remove document"
-              >
+              <span className="text-xs text-[var(--text-muted)]">{Math.round(zoom * 100)}%</span>
+              <div className="ml-auto flex items-center gap-1">
+                <button onClick={clearOverlay} className="p-1.5 rounded hover:bg-[var(--surface-muted)] text-[var(--text-secondary)]" title="Clear annotation">
+                  <Eraser size={14} />
+                </button>
+                <button onClick={saveOverlay} className="p-1.5 rounded hover:bg-[var(--surface-muted)] text-[var(--success-600)]" title="Save annotation">
+                  <Save size={14} />
+                </button>
+                <button
+                  onClick={() => removeAttachmentFromNote(note.id, selectedAttachment.id)}
+                  className="p-1.5 rounded hover:bg-red-50 text-[var(--danger-600)]"
+                  title="Remove document"
+                >
                 <Trash2 size={14} />
               </button>
             </div>
           </div>
 
-          <div ref={containerRef} className="flex-1 overflow-auto p-4 bg-gray-100">
+          <div ref={containerRef} className="flex-1 overflow-auto p-4 bg-[#edf2ff]">
             <div
-              className="mx-auto bg-white border border-gray-200 shadow-sm relative"
+              className="mx-auto bg-white border border-[var(--border)] shadow-sm relative rounded-md overflow-hidden"
               style={{ width: `${Math.round(780 * zoom)}px`, minHeight: `${Math.round(450 * zoom)}px` }}
             >
               {isImage ? (
@@ -219,25 +240,36 @@ export function DocumentWorkspace({ note, compact = false }: Props) {
               />
             </div>
             {!isImage && (
-              <p className="text-xs text-gray-500 mt-2">
-                Tip: for PDFs, the annotation layer is saved as an overlay snapshot and can be searched by indexed text below.
-              </p>
-            )}
+                <p className="text-xs text-[var(--text-muted)] mt-2">
+                  Tip: for PDFs, the annotation layer is saved as an overlay snapshot and can be searched by indexed text below.
+                </p>
+              )}
           </div>
 
-          <div className="px-3 py-3 border-t border-gray-200 bg-white">
-            <label className="text-xs font-medium text-gray-600 block mb-1">Indexed text (for handwriting/OCR search)</label>
+          <div className="px-3 py-3 border-t border-[var(--border)] bg-white">
+            <label className="text-xs font-medium text-[var(--text-secondary)] block mb-1">Indexed text (for OCR / search)</label>
             <textarea
               value={selectedAttachment.indexedText}
               onChange={(e) => saveIndexText(selectedAttachment, e.target.value)}
               rows={2}
-              className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs outline-none focus:border-blue-400"
+              className="w-full border border-[var(--border)] rounded-lg px-2 py-1.5 text-xs outline-none focus:border-[var(--primary-500)]"
               placeholder="Add key terms from this document (e.g., nephron, RAAS, glomerulus)..."
             />
+            <div className="mt-2 flex flex-wrap gap-2">
+              <button onClick={() => runSmartAction('flashcard')} className="pill-button">
+                <Brain size={12} /> Create flashcard seed
+              </button>
+              <button onClick={() => runSmartAction('summary')} className="pill-button">
+                <Sparkles size={12} /> Generate summary block
+              </button>
+              <button onClick={() => runSmartAction('insert')} className="pill-button">
+                <FileText size={12} /> Add to note
+              </button>
+            </div>
           </div>
         </div>
       ) : (
-        <div className="flex-1 grid place-items-center text-gray-400 text-sm">
+        <div className="flex-1 grid place-items-center text-[var(--text-muted)] text-sm">
           <div className="text-center">
             <FileText size={36} className="mx-auto mb-2 opacity-40" />
             Upload a PDF/slide to start annotating.

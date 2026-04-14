@@ -10,8 +10,8 @@ export function DocumentsView() {
   const note = notes.find((n) => n.id === selectedNoteId);
 
   if (!note) {
-    return (
-      <div className="flex-1 grid place-items-center bg-gray-50 text-gray-400">
+      return (
+      <div className="flex-1 grid place-items-center app-bg text-[var(--text-muted)]">
         <div className="text-center">
           <FileText size={42} className="mx-auto mb-2 opacity-30" />
           <p>Select a note from the list to manage PDFs/slides.</p>

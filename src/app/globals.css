@@ -1,14 +1,208 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f4f7ff;
+  --foreground: #0f172a;
+  --surface: #ffffff;
+  --surface-muted: #f8faff;
+  --surface-accent: #eef3ff;
+  --border: #dbe5ff;
+  --border-strong: #c2d3ff;
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #64748b;
+  --primary-600: #3b5bdb;
+  --primary-500: #4c6ef5;
+  --primary-100: #e9eeff;
+  --accent-600: #7c3aed;
+  --accent-100: #f3e8ff;
+  --success-600: #0f9d75;
+  --success-100: #e8fbf5;
+  --warning-600: #d97706;
+  --warning-100: #fff7ed;
+  --danger-600: #dc2626;
+  --danger-100: #fee2e2;
+  --shadow-soft: 0 8px 28px rgba(29, 78, 216, 0.08);
+  --shadow-card: 0 2px 12px rgba(15, 23, 42, 0.05);
+  --focus-ring: 0 0 0 3px rgba(76, 110, 245, 0.24);
+  --radius-lg: 1rem;
+  --radius-xl: 1.25rem;
+  --radius-2xl: 1.5rem;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+  letter-spacing: 0.01em;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #c7d2fe transparent;
+}
+
+.app-bg {
+  background:
+    radial-gradient(circle at 20% 0%, rgba(76, 110, 245, 0.08) 0%, rgba(76, 110, 245, 0) 44%),
+    radial-gradient(circle at 90% 10%, rgba(124, 58, 237, 0.08) 0%, rgba(124, 58, 237, 0) 36%),
+    var(--background);
+}
+
+.surface-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-card);
+}
+
+.surface-card-accent {
+  background: var(--surface-accent);
+  border: 1px solid var(--border-strong);
+  box-shadow: var(--shadow-card);
+}
+
+.surface-card-success {
+  background: var(--success-100);
+  border: 1px solid color-mix(in srgb, var(--success-600) 18%, white);
+}
+
+.surface-card-warning {
+  background: var(--warning-100);
+  border: 1px solid color-mix(in srgb, var(--warning-600) 18%, white);
+}
+
+.surface-card-danger {
+  background: var(--danger-100);
+  border: 1px solid color-mix(in srgb, var(--danger-600) 18%, white);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1;
+  padding: 0.35rem 0.55rem;
+  font-weight: 600;
+}
+
+.chip-active {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--primary-500) 14%, white);
+  color: color-mix(in srgb, var(--primary-600) 86%, black);
+}
+
+.pill-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.55rem 0.85rem;
+  transition: all 160ms ease;
+}
+
+.pill-button:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-muted);
+}
+
+.pill-button-active {
+  border-color: transparent;
+  background: var(--primary-600);
+  color: white;
+}
+
+.tab-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  padding: 0.45rem 0.8rem;
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.tab-button:hover {
+  background: var(--surface-muted);
+}
+
+.tab-button-active {
+  background: color-mix(in srgb, var(--primary-500) 14%, white);
+  border-color: var(--border-strong);
+  color: var(--primary-600);
+}
+
+.segmented {
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 3px;
+  display: inline-flex;
+  gap: 0.25rem;
+}
+
+.segmented-item {
+  border-radius: 999px;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.4rem 0.75rem;
+}
+
+.segmented-item-active {
+  background: #fff;
+  color: var(--primary-600);
+  box-shadow: var(--shadow-card);
+}
+
+.floating-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, #fff 94%, var(--primary-100));
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-soft);
+  padding: 0.45rem;
+}
+
+.timeline-rail {
+  border: 1px solid var(--border);
+  background: var(--surface-muted);
+  border-radius: var(--radius-lg);
+  padding: 0.55rem 0.75rem;
+}
+
+.split-pane {
+  display: grid;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 1100px) {
+  .split-pane {
+    grid-template-columns: 1fr 0.92fr;
+    gap: 1rem;
+  }
+}
+
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
 }
 
 /* Tiptap editor styles */
@@ -26,7 +220,7 @@ body {
 .ProseMirror mark { background: #fef08a; padding: 0.1rem 0.2rem; border-radius: 2px; }
 .ProseMirror strong { font-weight: 700; }
 .ProseMirror em { font-style: italic; }
-.ProseMirror p { margin: 0.3rem 0; line-height: 1.6; }
+.ProseMirror p { margin: 0.35rem 0; line-height: 1.75; color: var(--text-primary); }
 .ProseMirror p.is-editor-empty:first-child::before {
   color: #94a3b8;
   content: attr(data-placeholder);

@@ -122,6 +122,7 @@ export interface AppState {
 
 export type AppView =
   | 'home'
+  | 'subjects'
   | 'notes'
   | 'note-editor'
   | 'flashcards'
@@ -131,4 +132,6 @@ export type AppView =
   | 'audio'
   | 'search'
   | 'documents'
-  | 'sync';
+  | 'sync'
+  | 'progress'
+  | 'collaboration';
