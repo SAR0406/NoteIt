@@ -11,6 +11,7 @@ const NVIDIA_NIM_BASE_URL = process.env.NVIDIA_NIM_BASE_URL || 'https://integrat
 const NVIDIA_NIM_GENAI_BASE_URL = process.env.NVIDIA_NIM_GENAI_BASE_URL || 'https://ai.api.nvidia.com/v1/genai';
 const NVIDIA_NIM_MODEL = process.env.NVIDIA_NIM_MODEL || 'openai/gpt-oss-120b';
 const NVIDIA_NIM_USE_CASE = process.env.NVIDIA_NIM_USE_CASE || 'Retrieval Augmented Generation';
+const BASE64_VALIDATION_PATTERN = /^[A-Za-z0-9+/]+={0,2}$/;
 
 type AIAction = 'summarize' | 'flashcards' | 'quiz' | 'diagram' | 'image-convert' | '3d';
 type GenerationModel = 'black-forest-labs/flux.2-klein-4b' | 'microsoft/trellis';
@@ -111,18 +112,11 @@ const toSafeHttpUrl = (value: unknown) => {
   return undefined;
 };
 
-const toSafeDataImage = (value: unknown) => {
-  if (typeof value !== 'string') return undefined;
-  const normalized = value.trim();
-  if (!normalized) return undefined;
-  if (normalized.startsWith('data:image/')) return normalized;
-  return undefined;
-};
-
 const toDataImageFromBase64 = (value: unknown) => {
   if (typeof value !== 'string') return undefined;
-  const normalized = value.trim();
+  const normalized = value.trim().replace(/\s+/g, '');
   if (!normalized) return undefined;
+  if (!BASE64_VALIDATION_PATTERN.test(normalized)) return undefined;
   try {
     const decoded = Buffer.from(normalized, 'base64');
     if (decoded.length === 0) return undefined;
@@ -133,6 +127,16 @@ const toDataImageFromBase64 = (value: unknown) => {
     return undefined;
   }
   return `data:image/png;base64,${normalized}`;
+};
+
+const toSafePreviewImage = (value: unknown) => {
+  if (typeof value !== 'string') return undefined;
+  const normalized = value.trim();
+  if (!normalized) return undefined;
+  if (normalized.startsWith('data:image/')) return normalized;
+  const safeUrl = toSafeHttpUrl(normalized);
+  if (safeUrl) return safeUrl;
+  return toDataImageFromBase64(normalized);
 };
 
 const readNestedString = (value: unknown, keys: string[]) => {
@@ -147,20 +151,33 @@ const readNestedString = (value: unknown, keys: string[]) => {
 
 const extractPreviewImage = (raw: unknown) => {
   if (!raw || typeof raw !== 'object') return undefined;
-  const direct = toSafeDataImage(readNestedString(raw, ['image'])) ?? toSafeHttpUrl(readNestedString(raw, ['image']));
-  if (direct) return direct;
 
-  const firstImages =
-    readNestedString(raw, ['images', '0']) ??
-    readNestedString(raw, ['output', '0', 'url']) ??
-    readNestedString(raw, ['data', '0', 'url']);
-  if (firstImages) return toSafeDataImage(firstImages) ?? toSafeHttpUrl(firstImages);
+  // FLUX/Trellis endpoints can return direct image/base64 fields or OpenAI-style arrays.
+  const candidatePaths = [
+    ['image'],
+    ['output_image'],
+    ['preview_image'],
+    ['images', '0'],
+    ['images', '0', 'url'],
+    ['images', '0', 'image'],
+    ['images', '0', 'b64_json'],
+    ['images', '0', 'base64'],
+    ['output', '0', 'url'],
+    ['output', '0', 'image'],
+    ['output', '0', 'b64_json'],
+    ['data', '0', 'url'],
+    ['data', '0', 'image'],
+    ['data', '0', 'b64_json'],
+    ['b64_json'],
+    ['artifacts', '0', 'url'],
+    ['artifacts', '0', 'b64_json'],
+    ['artifacts', '0', 'base64'],
+  ];
 
-  const encodedImage = readNestedString(raw, ['b64_json']) ?? readNestedString(raw, ['data', '0', 'b64_json']);
-  if (encodedImage) return toDataImageFromBase64(encodedImage);
-
-  const artifactUrl = readNestedString(raw, ['artifacts', '0', 'url']);
-  if (artifactUrl) return toSafeHttpUrl(artifactUrl);
+  for (const path of candidatePaths) {
+    const preview = toSafePreviewImage(readNestedString(raw, path));
+    if (preview) return preview;
+  }
 
   return undefined;
 };
@@ -169,10 +186,12 @@ const extractAssetUrl = (raw: unknown) => {
   if (!raw || typeof raw !== 'object') return undefined;
   return (
     toSafeHttpUrl(readNestedString(raw, ['asset_url'])) ??
+    toSafeHttpUrl(readNestedString(raw, ['assetUrl'])) ??
     toSafeHttpUrl(readNestedString(raw, ['model_url'])) ??
     toSafeHttpUrl(readNestedString(raw, ['mesh_url'])) ??
     toSafeHttpUrl(readNestedString(raw, ['url'])) ??
-    toSafeHttpUrl(readNestedString(raw, ['artifacts', '0', 'url']))
+    toSafeHttpUrl(readNestedString(raw, ['artifacts', '0', 'url'])) ??
+    toSafeHttpUrl(readNestedString(raw, ['artifacts', '0', 'asset_url']))
   );
 };
 

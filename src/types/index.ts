@@ -33,6 +33,7 @@ export interface CanvasSticker {
 export interface Notebook {
   id: string;
   name: string;
+  academicYear?: 1 | 2 | 3 | 4;
   color: string;
   icon: string;
   subjectIds: string[];
@@ -122,6 +123,7 @@ export interface AppState {
 
 export type AppView =
   | 'home'
+  | 'subjects'
   | 'notes'
   | 'note-editor'
   | 'flashcards'
@@ -131,4 +133,6 @@ export type AppView =
   | 'audio'
   | 'search'
   | 'documents'
-  | 'sync';
+  | 'sync'
+  | 'progress'
+  | 'collaboration';

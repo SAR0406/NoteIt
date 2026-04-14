@@ -84,6 +84,6 @@ export const MEDICAL_TAGS = [
 ];
 
 export const NOTEBOOK_COLORS = [
-  '#ef4444', '#f97316', '#eab308', '#22c55e',
-  '#14b8a6', '#3b82f6', '#8b5cf6', '#ec4899',
+  '#3b5bdb', '#4c6ef5', '#7c3aed', '#0f9d75',
+  '#0ea5a4', '#2563eb', '#6366f1', '#8b5cf6',
 ];

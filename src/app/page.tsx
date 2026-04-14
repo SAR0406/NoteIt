@@ -12,6 +12,9 @@ import { SearchView } from '@/components/search/SearchView';
 import { HomeView } from '@/components/HomeView';
 import { DocumentsView } from '@/components/documents/DocumentsView';
 import { SyncView } from '@/components/sync/SyncView';
+import { SubjectsView } from '@/components/subjects/SubjectsView';
+import { ProgressDashboardView } from '@/components/progress/ProgressDashboardView';
+import { CollaborationView } from '@/components/collaboration/CollaborationView';
 import { Toaster } from 'react-hot-toast';
 
 export default function AppPage() {
@@ -20,7 +23,7 @@ export default function AppPage() {
   const showNotesList = activeView === 'notes' || activeView === 'note-editor' || activeView === 'documents';
 
   return (
-    <div className="flex h-screen overflow-hidden bg-white">
+    <div className="flex h-screen overflow-hidden app-bg">
       <Toaster position="top-right" />
       <Sidebar />
 
@@ -29,20 +32,23 @@ export default function AppPage() {
         {/* Notes list panel (only for notes views) */}
         {showNotesList && <NotesList />}
 
-        {/* Primary content */}
-        <div className="flex-1 overflow-hidden flex flex-col">
-          {activeView === 'home' && <HomeView />}
-          {(activeView === 'notes' || activeView === 'note-editor') && <NoteEditor />}
-          {activeView === 'flashcards' && <FlashcardsView />}
-          {activeView === 'flashcard-review' && <FlashcardReview />}
-          {activeView === 'graph' && <GraphView />}
-          {activeView === 'audio' && <AudioView />}
+          {/* Primary content */}
+          <div className="flex-1 overflow-hidden flex flex-col">
+            {activeView === 'home' && <HomeView />}
+            {activeView === 'subjects' && <SubjectsView />}
+            {(activeView === 'notes' || activeView === 'note-editor') && <NoteEditor />}
+            {activeView === 'flashcards' && <FlashcardsView />}
+            {activeView === 'flashcard-review' && <FlashcardReview />}
+            {activeView === 'graph' && <GraphView />}
+            {activeView === 'audio' && <AudioView />}
           {activeView === 'templates' && <TemplatesView />}
-          {activeView === 'search' && <SearchView />}
-          {activeView === 'documents' && <DocumentsView />}
-          {activeView === 'sync' && <SyncView />}
+            {activeView === 'search' && <SearchView />}
+            {activeView === 'documents' && <DocumentsView />}
+            {activeView === 'sync' && <SyncView />}
+            {activeView === 'progress' && <ProgressDashboardView />}
+            {activeView === 'collaboration' && <CollaborationView />}
+          </div>
         </div>
       </div>
-    </div>
   );
 }

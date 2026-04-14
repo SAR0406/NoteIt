@@ -27,7 +27,7 @@ interface Actions {
   selectNote: (id: string | null) => void;
 
   // Notebooks
-  addNotebook: (name: string, color: string) => Notebook;
+  addNotebook: (name: string, color: string, academicYear?: 1 | 2 | 3 | 4) => Notebook;
   updateNotebook: (id: string, patch: Partial<Notebook>) => void;
   deleteNotebook: (id: string) => void;
 
@@ -93,6 +93,7 @@ const initialState: AppState = {
     {
       id: SAMPLE_NOTEBOOK_ID,
       name: 'Anatomy',
+      academicYear: 1,
       color: '#3b82f6',
       icon: '🫀',
       subjectIds: [SAMPLE_SUBJECT_ID],
@@ -102,6 +103,7 @@ const initialState: AppState = {
     {
       id: 'nb-pharma',
       name: 'Pharmacology',
+      academicYear: 2,
       color: '#8b5cf6',
       icon: '💊',
       subjectIds: ['sub-autonomic'],
@@ -257,10 +259,11 @@ export const useStore = create<AppState & Actions>()(
       selectNote: (id) => set({ selectedNoteId: id }),
 
       // Notebooks
-      addNotebook: (name, color) => {
+      addNotebook: (name, color, academicYear = 1) => {
         const nb: Notebook = {
           id: generateId(),
           name,
+          academicYear,
           color,
           icon: '📓',
           subjectIds: [],

@@ -1,8 +1,15 @@
 'use client';
 import React from 'react';
 import { useStore } from '@/store/useStore';
-import { Brain, BookOpen, Star, LayoutTemplate, Mic, Link2, Plus, ChevronRight, Files, Cloud } from 'lucide-react';
+import {
+  Brain, BookOpen, Plus, ChevronRight, Files, Mic,
+  Flame, CalendarClock, Target, Sparkles, BarChart3,
+} from 'lucide-react';
 import { formatDate, isDue } from '@/lib/utils';
+import { PillButton, SectionCard, StatCard } from '@/components/ui/primitives';
+
+// TODO: Replace with per-user exam schedule from persisted profile/settings.
+const DEFAULT_EXAM_COUNTDOWN_DAYS = 12;
 
 export function HomeView() {
   const {
@@ -12,6 +19,23 @@ export function HomeView() {
 
   const dueCards = flashcards.filter((fc) => isDue(fc.dueDate));
   const recentNotes = [...notes].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()).slice(0, 6);
+  const latestNote = recentNotes[0];
+
+  const weakTopics = (() => {
+    const counts: Record<string, number> = {};
+    dueCards.forEach((card) => {
+      card.tags.forEach((tag) => {
+        counts[tag] = (counts[tag] ?? 0) + 1;
+      });
+    });
+    return Object.entries(counts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([tag]) => tag);
+  })();
+
+  const reviewPressure = dueCards.length > 50 ? 'High' : dueCards.length > 20 ? 'Moderate' : 'Balanced';
+  const countdownDays = DEFAULT_EXAM_COUNTDOWN_DAYS;
 
   const handleNewNote = () => {
     const note = addNote({ topicId: selectedTopicId, subjectId: selectedSubjectId, notebookId: selectedNotebookId });
@@ -20,144 +44,150 @@ export function HomeView() {
   };
 
   return (
-    <div className="flex-1 overflow-y-auto bg-gray-50 p-6">
-      <div className="max-w-4xl mx-auto">
-        {/* Hero */}
-        <div className="bg-gradient-to-br from-blue-600 to-purple-700 rounded-3xl p-8 text-white mb-8 shadow-lg">
-          <div className="flex items-start justify-between">
+    <div className="flex-1 overflow-y-auto app-bg p-6">
+      <div className="mx-auto max-w-5xl space-y-6">
+        <div className="surface-card-accent rounded-3xl p-6 md:p-7">
+          <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <h1 className="text-3xl font-bold mb-1 flex items-center gap-2">
-                <Brain size={32} /> NoteIt MBBS
+              <h1 className="text-2xl md:text-3xl font-semibold text-[var(--text-primary)] mb-1 flex items-center gap-2">
+                👋 Good Evening, Student
               </h1>
-              <p className="text-blue-100 text-lg">Your all-in-one medical study companion</p>
-              <p className="text-blue-200 text-sm mt-1">
-                {notes.length} notes · {flashcards.length} flashcards · {notebooks.length} notebooks
-              </p>
+              <p className="text-[var(--text-secondary)] text-sm md:text-base">Today’s control center for writing, recall, and revision momentum.</p>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <span className="chip chip-active"><CalendarClock size={12} /> Anatomy exam in {countdownDays} days</span>
+                <span className="chip"><Target size={12} /> Revision pressure: {reviewPressure}</span>
+                <span className="chip"><Sparkles size={12} /> {notes.length} notes · {flashcards.length} cards · {notebooks.length} groups</span>
+              </div>
             </div>
-            <button
-              onClick={handleNewNote}
-              className="flex items-center gap-2 bg-white text-blue-700 px-4 py-2 rounded-xl font-medium hover:bg-blue-50 shadow-md"
-            >
-              <Plus size={18} /> New Note
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <PillButton className="pill-button-active" onClick={handleNewNote}><Plus size={14} /> New Note</PillButton>
+              <PillButton onClick={() => setActiveView('audio')}><Mic size={14} /> Record Lecture</PillButton>
+              <PillButton onClick={() => setActiveView('documents')}><Files size={14} /> Import PDF</PillButton>
+            </div>
           </div>
         </div>
 
-        {/* Quick actions */}
-        <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-8">
-          {[
-            { icon: <BookOpen size={22} />, label: 'Browse Notes', view: 'notes' as const, color: 'bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100' },
-            { icon: <Brain size={22} />, label: dueCards.length > 0 ? `Review ${dueCards.length} Cards` : 'Flashcards', view: 'flashcards' as const, color: `bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100 ${dueCards.length > 0 ? 'ring-2 ring-orange-300' : ''}` },
-            { icon: <LayoutTemplate size={22} />, label: 'Templates', view: 'templates' as const, color: 'bg-green-50 border-green-200 text-green-700 hover:bg-green-100' },
-            { icon: <Mic size={22} />, label: 'Audio Notes', view: 'audio' as const, color: 'bg-red-50 border-red-200 text-red-700 hover:bg-red-100' },
-            { icon: <Files size={22} />, label: 'PDF Workspace', view: 'documents' as const, color: 'bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100' },
-            { icon: <Cloud size={22} />, label: 'Sync Backup', view: 'sync' as const, color: 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100' },
-          ].map(({ icon, label, view, color }) => (
-            <button
-              key={view}
-              onClick={() => setActiveView(view)}
-              className={`border rounded-2xl p-4 flex flex-col items-center gap-2 font-medium transition-colors ${color}`}
-            >
-              {icon}
-              <span className="text-sm">{label}</span>
-            </button>
-          ))}
+        <div className="grid gap-3 md:grid-cols-4">
+          <StatCard label="Total Notes" value={notes.length} icon={<BookOpen size={16} className="text-[var(--primary-600)]" />} />
+          <StatCard label="Cards Due Today" value={dueCards.length} icon={<Brain size={16} className="text-[var(--accent-600)]" />} />
+          <StatCard label="Study Streak Signal" value={`${Math.min(100, 60 + Math.round(notes.length / 2))}%`} icon={<Flame size={16} className="text-[var(--warning-600)]" />} />
+          <StatCard label="Knowledge Links" value={notes.filter((n) => n.linkedNoteIds.length > 0).length} icon={<BarChart3 size={16} className="text-[var(--success-600)]" />} />
         </div>
 
-        <div className="grid md:grid-cols-2 gap-6">
-          {/* Recent notes */}
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-bold text-gray-800 flex items-center gap-2"><BookOpen size={18} /> Recent Notes</h2>
-              <button onClick={() => setActiveView('notes')} className="text-blue-600 text-xs hover:underline flex items-center gap-1">
-                See all <ChevronRight size={12} />
+        <div className="grid gap-4 lg:grid-cols-2">
+          <SectionCard
+            title="Continue Studying"
+            subtitle={latestNote ? `Last updated ${formatDate(latestNote.updatedAt)}` : 'Jump back into your last active note'}
+            action={latestNote ? (
+              <button
+                onClick={() => {
+                  selectNote(latestNote.id);
+                  setActiveView('note-editor');
+                }}
+                className="tab-button tab-button-active"
+              >
+                Open <ChevronRight size={12} />
               </button>
-            </div>
-            {recentNotes.length === 0 && <p className="text-gray-400 text-sm">No notes yet</p>}
-            <div className="space-y-2">
-              {recentNotes.map((note) => (
-                <div
-                  key={note.id}
-                  className="flex items-center gap-3 p-2 rounded-xl hover:bg-gray-50 cursor-pointer"
-                  onClick={() => { selectNote(note.id); setActiveView('note-editor'); }}
+            ) : undefined}
+          >
+            {latestNote ? (
+              <button
+                onClick={() => {
+                  selectNote(latestNote.id);
+                  setActiveView('note-editor');
+                }}
+                className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface-muted)] p-3 text-left hover:border-[var(--border-strong)]"
+              >
+                <p className="text-sm font-semibold text-[var(--text-primary)]">{latestNote.title}</p>
+                <p className="mt-1 text-xs text-[var(--text-secondary)] line-clamp-2">
+                  {latestNote.content.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120) || 'No content yet'}
+                </p>
+              </button>
+            ) : (
+              <p className="text-sm text-[var(--text-muted)]">No notes yet — create your first note to begin.</p>
+            )}
+          </SectionCard>
+
+          <SectionCard
+            title="Flashcards Due Today"
+            subtitle={dueCards.length > 0 ? `${dueCards.length} cards are ready` : 'All caught up'}
+            tone={dueCards.length > 0 ? 'warning' : 'success'}
+            action={dueCards.length > 0 ? (
+              <button onClick={() => setActiveView('flashcard-review')} className="pill-button pill-button-active">
+                Start Session
+              </button>
+            ) : undefined}
+          >
+            {dueCards.length > 0 ? (
+              <div className="space-y-1 text-xs text-[var(--text-secondary)]">
+                {dueCards.slice(0, 5).map((fc) => (
+                  <p key={fc.id} className="truncate">• {fc.front}</p>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-[var(--success-600)]">No cards due right now.</p>
+            )}
+          </SectionCard>
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-2">
+          <SectionCard title="Weak Topics" subtitle="Most frequent due areas">
+            {weakTopics.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {weakTopics.map((topic) => (
+                  <button
+                    key={topic}
+                    onClick={() => {
+                      setActiveView('flashcards');
+                    }}
+                    className="chip chip-active"
+                  >
+                    {topic}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-[var(--text-muted)]">No weak signals yet. Continue writing and reviewing for insights.</p>
+            )}
+          </SectionCard>
+
+          <SectionCard title="Quick Actions" subtitle="One-tap jump to essential workflows" tone="accent">
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { label: 'New Note', action: handleNewNote },
+                { label: 'Review Cards', action: () => setActiveView('flashcard-review') },
+                { label: 'Open Subjects', action: () => setActiveView('subjects') },
+                { label: 'Open Documents', action: () => setActiveView('documents') },
+              ].map((item) => (
+                <button
+                  key={item.label}
+                  onClick={item.action}
+                  className="rounded-xl border border-[var(--border)] bg-white px-3 py-2 text-xs font-medium text-[var(--text-secondary)] hover:border-[var(--border-strong)]"
                 >
-                  {note.isFavorite ? <Star size={14} className="text-yellow-500 fill-yellow-500 flex-shrink-0" /> : <BookOpen size={14} className="text-gray-400 flex-shrink-0" />}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-800 truncate">{note.title}</p>
-                    <p className="text-xs text-gray-400">{formatDate(note.updatedAt)}</p>
-                  </div>
-                  {note.tags.slice(0, 1).map((tag) => (
-                    <span key={tag} className="text-xs bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full flex-shrink-0">{tag}</span>
-                  ))}
-                </div>
+                  {item.label}
+                </button>
               ))}
             </div>
-          </div>
+          </SectionCard>
+        </div>
 
-          {/* Flashcards due + Graph */}
-          <div className="space-y-4">
-            {dueCards.length > 0 && (
-              <div className="bg-orange-50 border border-orange-200 rounded-2xl p-5">
-                <div className="flex items-center justify-between mb-2">
-                  <h2 className="font-bold text-orange-700 flex items-center gap-2"><Brain size={18} /> Cards Due</h2>
-                  <button
-                    onClick={() => setActiveView('flashcard-review')}
-                    className="text-xs bg-orange-500 text-white px-3 py-1 rounded-lg hover:bg-orange-600"
-                  >
-                    Review Now
-                  </button>
-                </div>
-                <p className="text-orange-600 text-sm">{dueCards.length} flashcard{dueCards.length !== 1 ? 's' : ''} ready for review</p>
-                <div className="mt-2 space-y-1">
-                  {dueCards.slice(0, 3).map((fc) => (
-                    <p key={fc.id} className="text-xs text-orange-500 truncate">• {fc.front}</p>
-                  ))}
-                </div>
-              </div>
+        <SectionCard title="Recent Notes" subtitle="Fast return to active contexts">
+          <div className="grid gap-2 md:grid-cols-2">
+            {recentNotes.slice(0, 6).map((note) => (
+              <button
+                key={note.id}
+                onClick={() => { selectNote(note.id); setActiveView('note-editor'); }}
+                className="rounded-xl border border-[var(--border)] bg-white p-3 text-left hover:border-[var(--border-strong)]"
+              >
+                <p className="text-sm font-semibold text-[var(--text-primary)] truncate">{note.title}</p>
+                <p className="text-xs text-[var(--text-muted)] mt-1">Updated {formatDate(note.updatedAt)}</p>
+              </button>
+            ))}
+            {recentNotes.length === 0 && (
+              <p className="text-sm text-[var(--text-muted)]">No notes yet.</p>
             )}
-
-            {/* Linked notes / graph teaser */}
-            <div className="bg-white border border-gray-200 rounded-2xl p-5">
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="font-bold text-gray-800 flex items-center gap-2"><Link2 size={18} /> Note Connections</h2>
-                <button onClick={() => setActiveView('graph')} className="text-blue-600 text-xs hover:underline flex items-center gap-1">
-                  Open Graph <ChevronRight size={12} />
-                </button>
-              </div>
-              <div className="space-y-2">
-                {notes.filter((n) => n.linkedNoteIds.length > 0).slice(0, 4).map((note) => (
-                  <div key={note.id} className="flex items-center gap-2 text-sm">
-                    <span className="text-gray-700 truncate flex-1">{note.title}</span>
-                    <span className="text-xs text-blue-500 flex-shrink-0">🔗 {note.linkedNoteIds.length}</span>
-                  </div>
-                ))}
-                {notes.filter((n) => n.linkedNoteIds.length > 0).length === 0 && (
-                  <p className="text-gray-400 text-sm">No linked notes yet. Open a note and use the 🔗 button.</p>
-                )}
-              </div>
-            </div>
           </div>
-        </div>
-
-        {/* Feature highlights */}
-        <div className="mt-8 grid grid-cols-2 md:grid-cols-4 gap-3">
-          {[
-            { emoji: '✍️', title: 'Rich Editor', desc: 'Bold, italic, headings, lists, code blocks' },
-            { emoji: '🧠', title: 'Spaced Repetition', desc: 'SM-2 algorithm for optimal revision' },
-            { emoji: '🔗', title: 'Note Linking', desc: 'Connect related topics like Obsidian' },
-            { emoji: '🤖', title: 'AI Tools', desc: 'Summarize notes & generate flashcards' },
-            { emoji: '🎧', title: 'Audio Sync', desc: 'Record lectures with timestamps' },
-            { emoji: '🎨', title: 'Templates', desc: 'SOAP, Case Sheet, Anatomy, Pharma' },
-            { emoji: '🔍', title: 'Full Search', desc: 'Search by content, title, or tags' },
-            { emoji: '💾', title: 'Auto-save', desc: 'All data saved locally, no login needed' },
-          ].map(({ emoji, title, desc }) => (
-            <div key={title} className="bg-white rounded-xl border border-gray-100 p-3">
-              <div className="text-2xl mb-1">{emoji}</div>
-              <p className="text-sm font-semibold text-gray-800">{title}</p>
-              <p className="text-xs text-gray-500 mt-0.5">{desc}</p>
-            </div>
-          ))}
-        </div>
+        </SectionCard>
       </div>
     </div>
   );
