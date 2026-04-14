@@ -11,6 +11,7 @@ const NVIDIA_NIM_BASE_URL = process.env.NVIDIA_NIM_BASE_URL || 'https://integrat
 const NVIDIA_NIM_GENAI_BASE_URL = process.env.NVIDIA_NIM_GENAI_BASE_URL || 'https://ai.api.nvidia.com/v1/genai';
 const NVIDIA_NIM_MODEL = process.env.NVIDIA_NIM_MODEL || 'openai/gpt-oss-120b';
 const NVIDIA_NIM_USE_CASE = process.env.NVIDIA_NIM_USE_CASE || 'Retrieval Augmented Generation';
+const BASE64_PATTERN = /^[A-Za-z0-9+/]+={0,2}$/;
 
 type AIAction = 'summarize' | 'flashcards' | 'quiz' | 'diagram' | 'image-convert' | '3d';
 type GenerationModel = 'black-forest-labs/flux.2-klein-4b' | 'microsoft/trellis';
@@ -111,18 +112,11 @@ const toSafeHttpUrl = (value: unknown) => {
   return undefined;
 };
 
-const toSafeDataImage = (value: unknown) => {
-  if (typeof value !== 'string') return undefined;
-  const normalized = value.trim();
-  if (!normalized) return undefined;
-  if (normalized.startsWith('data:image/')) return normalized;
-  return undefined;
-};
-
 const toDataImageFromBase64 = (value: unknown) => {
   if (typeof value !== 'string') return undefined;
   const normalized = value.trim();
   if (!normalized) return undefined;
+  if (!BASE64_PATTERN.test(normalized)) return undefined;
   try {
     const decoded = Buffer.from(normalized, 'base64');
     if (decoded.length === 0) return undefined;
@@ -136,7 +130,13 @@ const toDataImageFromBase64 = (value: unknown) => {
 };
 
 const toSafePreviewImage = (value: unknown) => {
-  return toSafeDataImage(value) ?? toSafeHttpUrl(value) ?? toDataImageFromBase64(value);
+  if (typeof value !== 'string') return undefined;
+  const normalized = value.trim();
+  if (!normalized) return undefined;
+  if (normalized.startsWith('data:image/')) return normalized;
+  const safeUrl = toSafeHttpUrl(normalized);
+  if (safeUrl) return safeUrl;
+  return toDataImageFromBase64(normalized);
 };
 
 const readNestedString = (value: unknown, keys: string[]) => {
@@ -152,28 +152,30 @@ const readNestedString = (value: unknown, keys: string[]) => {
 const extractPreviewImage = (raw: unknown) => {
   if (!raw || typeof raw !== 'object') return undefined;
 
-  const candidates = [
-    readNestedString(raw, ['image']),
-    readNestedString(raw, ['output_image']),
-    readNestedString(raw, ['preview_image']),
-    readNestedString(raw, ['images', '0']),
-    readNestedString(raw, ['images', '0', 'url']),
-    readNestedString(raw, ['images', '0', 'image']),
-    readNestedString(raw, ['images', '0', 'b64_json']),
-    readNestedString(raw, ['images', '0', 'base64']),
-    readNestedString(raw, ['output', '0', 'url']),
-    readNestedString(raw, ['output', '0', 'image']),
-    readNestedString(raw, ['output', '0', 'b64_json']),
-    readNestedString(raw, ['data', '0', 'url']),
-    readNestedString(raw, ['data', '0', 'image']),
-    readNestedString(raw, ['data', '0', 'b64_json']),
-    readNestedString(raw, ['b64_json']),
-    readNestedString(raw, ['artifacts', '0', 'url']),
-    readNestedString(raw, ['artifacts', '0', 'b64_json']),
-    readNestedString(raw, ['artifacts', '0', 'base64']),
+  // FLUX/Trellis endpoints can return direct image/base64 fields or OpenAI-style arrays.
+  const candidatePaths = [
+    ['image'],
+    ['output_image'],
+    ['preview_image'],
+    ['images', '0'],
+    ['images', '0', 'url'],
+    ['images', '0', 'image'],
+    ['images', '0', 'b64_json'],
+    ['images', '0', 'base64'],
+    ['output', '0', 'url'],
+    ['output', '0', 'image'],
+    ['output', '0', 'b64_json'],
+    ['data', '0', 'url'],
+    ['data', '0', 'image'],
+    ['data', '0', 'b64_json'],
+    ['b64_json'],
+    ['artifacts', '0', 'url'],
+    ['artifacts', '0', 'b64_json'],
+    ['artifacts', '0', 'base64'],
   ];
-  for (const candidate of candidates) {
-    const preview = toSafePreviewImage(candidate);
+
+  for (const path of candidatePaths) {
+    const preview = toSafePreviewImage(readNestedString(raw, path));
     if (preview) return preview;
   }
 
