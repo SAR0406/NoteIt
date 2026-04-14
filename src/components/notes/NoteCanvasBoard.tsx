@@ -242,7 +242,6 @@ export function NoteCanvasBoard({ note }: Props) {
     if (canvas?.hasPointerCapture(event.pointerId)) {
       canvas.releasePointerCapture(event.pointerId);
     }
-    const canvas = drawCanvasRef.current;
     const ctx = canvas?.getContext('2d');
     if (drawing && shapeTool !== 'freehand' && canvas && ctx && drawStartRef.current && drawSnapshotRef.current) {
       const point = getCanvasPoint(event, canvas);
