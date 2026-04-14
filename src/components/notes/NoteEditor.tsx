@@ -35,6 +35,7 @@ export function NoteEditor() {
   } = useStore();
 
   const note = notes.find((n) => n.id === selectedNoteId);
+  const attachmentCount = note?.attachments.length ?? 0;
 
   const [showTagDropdown, setShowTagDropdown] = useState(false);
   const [showLinkDropdown, setShowLinkDropdown] = useState(false);
@@ -43,7 +44,7 @@ export function NoteEditor() {
   const [editingTitle, setEditingTitle] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
   const [splitMode, setSplitMode] = useState(false);
-  const [aiState, setAiState] = useState<'idle' | 'queued' | 'generating' | 'success' | 'fallback' | 'error'>('idle');
+  const [aiState, setAiState] = useState<'idle' | 'queued' | 'generating' | 'success' | 'partial-success' | 'retry' | 'fallback' | 'error'>('idle');
 
   const editor = useEditor(
     {
@@ -74,6 +75,11 @@ export function NoteEditor() {
       editor.commands.setContent(note.content);
     }
   }, [editor, note]);
+
+  React.useEffect(() => {
+    if (!note?.id) return;
+    setSplitMode(attachmentCount > 0);
+  }, [attachmentCount, note?.id]);
 
   const applyLocalFallback = (action: 'summarize' | 'flashcards' | 'quiz') => {
     if (!note) return;
@@ -185,7 +191,8 @@ export function NoteEditor() {
             toast.success(`${action === 'quiz' ? 'Quiz' : 'Flashcards'} generated (local fallback)`);
           } else {
             cards.forEach((card) => addFlashcard(card.front, card.back, note.id, note.tags));
-            setAiState('success');
+            const expected = action === 'quiz' ? AI_QUIZ_CARD_LIMIT : AI_FLASHCARD_CARD_LIMIT;
+            setAiState(cards.length < expected ? 'partial-success' : 'success');
             toast.success(`NVIDIA NIM ${action === 'quiz' ? 'quiz cards' : 'flashcards'} generated!`);
           }
         } else {
@@ -209,7 +216,7 @@ export function NoteEditor() {
             safeAsset ? `<p><a href="${escapeHtml(safeAsset)}" target="_blank" rel="noreferrer">Open generated asset</a></p>` : '',
             ].join('');
             updateNote(note.id, { content: `${note.content}<hr>${resultHtml}` });
-            setAiState('success');
+            setAiState(safePreview && safeAsset ? 'success' : 'partial-success');
             toast.success(action === '3d' ? 'Trellis 3D generation added to note!' : 'FLUX generation result added to note!');
           }
         }
@@ -219,7 +226,7 @@ export function NoteEditor() {
         setAiState('fallback');
         toast.success(`${action === 'quiz' ? 'Quiz' : action === 'summarize' ? 'Summary' : 'Flashcards'} generated (local fallback)`);
       } else {
-        setAiState('error');
+        setAiState('retry');
         toast.error('NVIDIA generation failed. Check API key and prompt/image input.');
       }
     }
@@ -457,8 +464,8 @@ export function NoteEditor() {
               </>
             )}
             {(aiLoading || aiState !== 'idle') && (
-              <span className={`chip ${aiState === 'success' ? 'chip-active' : ''}`}>
-                AI status: {aiLoading ? 'generating' : aiState}
+              <span className={`chip ${aiState === 'success' || aiState === 'partial-success' ? 'chip-active' : ''}`}>
+                AI status: {aiLoading ? 'generating' : aiState.replace(/-/g, ' ')}
               </span>
             )}
           </div>

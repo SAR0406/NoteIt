@@ -8,14 +8,16 @@ import { isDue } from '@/lib/utils';
 
 export function ProgressDashboardView() {
   const { notes, flashcards } = useStore();
-  const BASELINE_CONSISTENCY_INDEX = 52;
-  const ITEMS_PER_CONSISTENCY_STEP = 4;
+  // Starts at a neutral baseline so the scaffold doesn't imply a failing state on first use.
+  const CONSISTENCY_BASE_PERCENTAGE = 52;
+  // Every N study artifacts nudges the scaffolded consistency indicator up by roughly one step.
+  const CONSISTENCY_ITEMS_PER_STEP = 4;
   const due = flashcards.filter((fc) => isDue(fc.dueDate)).length;
   const linked = notes.filter((n) => n.linkedNoteIds.length > 0).length;
   const coverage = notes.length > 0 ? Math.round((linked / notes.length) * 100) : 0;
   const consistency = Math.min(
     100,
-    BASELINE_CONSISTENCY_INDEX + Math.round((notes.length + flashcards.length) / ITEMS_PER_CONSISTENCY_STEP)
+    CONSISTENCY_BASE_PERCENTAGE + Math.round((notes.length + flashcards.length) / CONSISTENCY_ITEMS_PER_STEP)
   );
 
   return (

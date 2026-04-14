@@ -11,7 +11,7 @@ const NVIDIA_NIM_BASE_URL = process.env.NVIDIA_NIM_BASE_URL || 'https://integrat
 const NVIDIA_NIM_GENAI_BASE_URL = process.env.NVIDIA_NIM_GENAI_BASE_URL || 'https://ai.api.nvidia.com/v1/genai';
 const NVIDIA_NIM_MODEL = process.env.NVIDIA_NIM_MODEL || 'openai/gpt-oss-120b';
 const NVIDIA_NIM_USE_CASE = process.env.NVIDIA_NIM_USE_CASE || 'Retrieval Augmented Generation';
-const BASE64_PATTERN = /^[A-Za-z0-9+/]+={0,2}$/;
+const BASE64_VALIDATION_PATTERN = /^[A-Za-z0-9+/]+={0,2}$/;
 
 type AIAction = 'summarize' | 'flashcards' | 'quiz' | 'diagram' | 'image-convert' | '3d';
 type GenerationModel = 'black-forest-labs/flux.2-klein-4b' | 'microsoft/trellis';
@@ -116,7 +116,7 @@ const toDataImageFromBase64 = (value: unknown) => {
   if (typeof value !== 'string') return undefined;
   const normalized = value.trim().replace(/\s+/g, '');
   if (!normalized) return undefined;
-  if (!BASE64_PATTERN.test(normalized)) return undefined;
+  if (!BASE64_VALIDATION_PATTERN.test(normalized)) return undefined;
   try {
     const decoded = Buffer.from(normalized, 'base64');
     if (decoded.length === 0) return undefined;

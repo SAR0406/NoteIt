@@ -8,6 +8,7 @@ import {
 import { formatDate, isDue } from '@/lib/utils';
 import { PillButton, SectionCard, StatCard } from '@/components/ui/primitives';
 
+// TODO: Replace with per-user exam schedule from persisted profile/settings.
 const DEFAULT_EXAM_COUNTDOWN_DAYS = 12;
 
 export function HomeView() {
