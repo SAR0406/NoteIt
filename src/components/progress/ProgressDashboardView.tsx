@@ -8,10 +8,15 @@ import { isDue } from '@/lib/utils';
 
 export function ProgressDashboardView() {
   const { notes, flashcards } = useStore();
+  const BASELINE_CONSISTENCY_INDEX = 52;
+  const ITEMS_PER_CONSISTENCY_STEP = 4;
   const due = flashcards.filter((fc) => isDue(fc.dueDate)).length;
   const linked = notes.filter((n) => n.linkedNoteIds.length > 0).length;
   const coverage = notes.length > 0 ? Math.round((linked / notes.length) * 100) : 0;
-  const consistency = Math.min(100, 52 + Math.round((notes.length + flashcards.length) / 4));
+  const consistency = Math.min(
+    100,
+    BASELINE_CONSISTENCY_INDEX + Math.round((notes.length + flashcards.length) / ITEMS_PER_CONSISTENCY_STEP)
+  );
 
   return (
     <div className="flex-1 overflow-y-auto app-bg p-6">

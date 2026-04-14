@@ -247,7 +247,7 @@ export function NoteEditor() {
 
   const linkedNotes = notes.filter((n) => note.linkedNoteIds.includes(n.id));
   const unlinkableNotes = notes.filter((n) => n.id !== note.id && !note.linkedNoteIds.includes(n.id));
-  const hasSelection = Boolean(editor && !editor.state.selection.empty);
+  const hasSelection = editor ? !editor.state.selection.empty : false;
 
   return (
     <div className="flex-1 flex flex-col bg-[var(--surface)] overflow-hidden">

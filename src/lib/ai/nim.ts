@@ -114,7 +114,7 @@ const toSafeHttpUrl = (value: unknown) => {
 
 const toDataImageFromBase64 = (value: unknown) => {
   if (typeof value !== 'string') return undefined;
-  const normalized = value.trim();
+  const normalized = value.trim().replace(/\s+/g, '');
   if (!normalized) return undefined;
   if (!BASE64_PATTERN.test(normalized)) return undefined;
   try {

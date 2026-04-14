@@ -6,6 +6,8 @@ import { BookOpen, Plus, ChevronRight, FolderOpen } from 'lucide-react';
 import { Chip, PillButton, SectionCard } from '@/components/ui/primitives';
 
 const YEAR_LABELS = ['Year 1', 'Year 2', 'Year 3', 'Year 4'];
+const MIN_ACADEMIC_YEAR = 1;
+const MAX_ACADEMIC_YEAR = 4;
 
 const SUBJECT_COLOR_BY_NAME: Record<string, string> = {
   anatomy: '#3b5bdb',
@@ -29,8 +31,9 @@ export function SubjectsView() {
 
   const yearBuckets = useMemo(() => {
     const buckets: Array<typeof notebooks> = [[], [], [], []];
-    notebooks.forEach((nb, idx) => {
-      const bucket = Math.min(Math.floor(idx / 3), 3);
+    notebooks.forEach((nb) => {
+      const year = nb.academicYear ?? MIN_ACADEMIC_YEAR;
+      const bucket = Math.min(Math.max(year, MIN_ACADEMIC_YEAR), MAX_ACADEMIC_YEAR) - 1;
       buckets[bucket].push(nb);
     });
     return buckets;

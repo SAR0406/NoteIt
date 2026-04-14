@@ -8,6 +8,8 @@ import {
 import { formatDate, isDue } from '@/lib/utils';
 import { PillButton, SectionCard, StatCard } from '@/components/ui/primitives';
 
+const DEFAULT_EXAM_COUNTDOWN_DAYS = 12;
+
 export function HomeView() {
   const {
     notes, flashcards, notebooks, setActiveView, selectNote,
@@ -32,7 +34,7 @@ export function HomeView() {
   })();
 
   const reviewPressure = dueCards.length > 50 ? 'High' : dueCards.length > 20 ? 'Moderate' : 'Balanced';
-  const countdownDays = 12;
+  const countdownDays = DEFAULT_EXAM_COUNTDOWN_DAYS;
 
   const handleNewNote = () => {
     const note = addNote({ topicId: selectedTopicId, subjectId: selectedSubjectId, notebookId: selectedNotebookId });

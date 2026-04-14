@@ -154,7 +154,7 @@ export function GraphView() {
     setPanStart(null);
   };
 
-  const root = notes[0];
+  const root = notes.length > 0 ? notes[0] : undefined;
 
   return (
     <div className="flex-1 flex flex-col app-bg">
