@@ -7,10 +7,21 @@ import {
 import { sanitizeModelText } from './text';
 
 const NVIDIA_NIM_BASE_URL = process.env.NVIDIA_NIM_BASE_URL || 'https://integrate.api.nvidia.com/v1';
+// Text/chat APIs and GenAI model endpoints are hosted on different NVIDIA domains.
+const NVIDIA_NIM_GENAI_BASE_URL = process.env.NVIDIA_NIM_GENAI_BASE_URL || 'https://ai.api.nvidia.com/v1/genai';
 const NVIDIA_NIM_MODEL = process.env.NVIDIA_NIM_MODEL || 'openai/gpt-oss-120b';
 const NVIDIA_NIM_USE_CASE = process.env.NVIDIA_NIM_USE_CASE || 'Retrieval Augmented Generation';
 
-type AIAction = 'summarize' | 'flashcards' | 'quiz';
+type AIAction = 'summarize' | 'flashcards' | 'quiz' | 'diagram' | 'image-convert' | '3d';
+type GenerationModel = 'black-forest-labs/flux.1-kontext-dev' | 'black-forest-labs/flux.1-schnell' | 'microsoft/trellis';
+const GENERATION_ACTIONS = ['diagram', 'image-convert', '3d'] as const;
+const GENERATION_ACTION_SET = new Set<AIAction>(GENERATION_ACTIONS);
+// Explicit allowlist keeps request targets fixed to known-safe endpoints.
+const GENERATION_MODEL_ENDPOINTS: Record<GenerationModel, string> = {
+  'black-forest-labs/flux.1-kontext-dev': 'black-forest-labs/flux.1-kontext-dev',
+  'black-forest-labs/flux.1-schnell': 'black-forest-labs/flux.1-schnell',
+  'microsoft/trellis': 'microsoft/trellis',
+};
 
 export interface NIMRequestPayload {
   action: AIAction;
@@ -20,11 +31,21 @@ export interface NIMRequestPayload {
   handwritingIndex: string;
   attachmentIndex: string[];
   drawingIndex: string[];
+  prompt?: string;
+  image?: string;
+  model?: GenerationModel;
 }
 
 interface NIMResult {
   summaryPoints?: string[];
   flashcards?: Array<{ front: string; back: string }>;
+  generated?: {
+    action: AIAction;
+    model: GenerationModel;
+    raw: unknown;
+    previewImage?: string;
+    assetUrl?: string;
+  };
 }
 
 const stripHtml = (value: string) => {
@@ -83,10 +104,144 @@ const parseAiOutput = (text: string): NIMResult => {
   }
 };
 
+const toSafeHttpUrl = (value: unknown) => {
+  if (typeof value !== 'string') return undefined;
+  const normalized = value.trim();
+  if (!normalized) return undefined;
+  if (normalized.startsWith('https://')) return normalized;
+  return undefined;
+};
+
+const toSafeDataImage = (value: unknown) => {
+  if (typeof value !== 'string') return undefined;
+  const normalized = value.trim();
+  if (!normalized) return undefined;
+  if (normalized.startsWith('data:image/')) return normalized;
+  return undefined;
+};
+
+const readNestedString = (value: unknown, keys: string[]) => {
+  if (!value || typeof value !== 'object') return undefined;
+  let cursor: unknown = value;
+  for (const key of keys) {
+    if (!cursor || typeof cursor !== 'object' || !(key in cursor)) return undefined;
+    cursor = (cursor as Record<string, unknown>)[key];
+  }
+  return typeof cursor === 'string' ? cursor : undefined;
+};
+
+const extractPreviewImage = (raw: unknown) => {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const direct = toSafeDataImage(readNestedString(raw, ['image'])) ?? toSafeHttpUrl(readNestedString(raw, ['image']));
+  if (direct) return direct;
+
+  const firstImages = readNestedString(raw, ['images', '0']) ?? readNestedString(raw, ['output', '0', 'url']);
+  if (firstImages) return toSafeDataImage(firstImages) ?? toSafeHttpUrl(firstImages);
+
+  const artifactUrl = readNestedString(raw, ['artifacts', '0', 'url']);
+  if (artifactUrl) return toSafeHttpUrl(artifactUrl);
+
+  return undefined;
+};
+
+const extractAssetUrl = (raw: unknown) => {
+  if (!raw || typeof raw !== 'object') return undefined;
+  return (
+    toSafeHttpUrl(readNestedString(raw, ['asset_url'])) ??
+    toSafeHttpUrl(readNestedString(raw, ['model_url'])) ??
+    toSafeHttpUrl(readNestedString(raw, ['mesh_url'])) ??
+    toSafeHttpUrl(readNestedString(raw, ['url'])) ??
+    toSafeHttpUrl(readNestedString(raw, ['artifacts', '0', 'url']))
+  );
+};
+
+const resolveGenerationModel = (payload: NIMRequestPayload): GenerationModel => {
+  if (payload.action === '3d') return 'microsoft/trellis';
+  const requestedModel = payload.model;
+  // Trellis is dedicated to 3D generation, so diagram/photo flows only allow FLUX models.
+  if (requestedModel && requestedModel in GENERATION_MODEL_ENDPOINTS && requestedModel !== 'microsoft/trellis') {
+    return requestedModel;
+  }
+  return 'black-forest-labs/flux.1-kontext-dev';
+};
+
+const callGenerationModel = async (
+  payload: NIMRequestPayload,
+  apiKey: string
+): Promise<NIMResult['generated']> => {
+  const model = resolveGenerationModel(payload);
+  const prompt = payload.prompt?.trim();
+  if (!prompt) throw new Error('Prompt is required for generation');
+
+  let body: Record<string, unknown>;
+  if (payload.action === '3d') {
+    // Trellis controls two-stage structured latent + shape sampling quality/speed tradeoff.
+    body = {
+      prompt,
+      slat_cfg_scale: 3,
+      ss_cfg_scale: 7.5,
+      slat_sampling_steps: 25,
+      ss_sampling_steps: 25,
+      seed: 0,
+    };
+  } else if (payload.action === 'image-convert') {
+    if (!payload.image?.startsWith('data:image/')) {
+      throw new Error('Image must be a data URL with format: data:image/{type};base64,{data}');
+    }
+    body = {
+      prompt,
+      image: payload.image,
+      aspect_ratio: 'match_input_image',
+      steps: 30,
+      cfg_scale: 3.5,
+      seed: 0,
+    };
+  } else {
+    body = {
+      prompt,
+      aspect_ratio: '16:9',
+      steps: 30,
+      cfg_scale: 3.5,
+      seed: 0,
+    };
+  }
+
+  const endpoint = GENERATION_MODEL_ENDPOINTS[model];
+
+  const response = await fetch(`${NVIDIA_NIM_GENAI_BASE_URL}/${endpoint}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const responseText = await response.text();
+    throw new Error(`NIM generation request failed (${response.status}): ${responseText.slice(0, 200)}`);
+  }
+
+  const raw = (await response.json()) as unknown;
+  return {
+    action: payload.action,
+    model,
+    raw,
+    previewImage: extractPreviewImage(raw),
+    assetUrl: extractAssetUrl(raw),
+  };
+};
+
 export async function generateWithNIM(payload: NIMRequestPayload): Promise<NIMResult> {
   const apiKey = process.env.NVIDIA_API_KEY;
   if (!apiKey) {
     throw new Error('NVIDIA_API_KEY is not configured');
+  }
+
+  if (GENERATION_ACTION_SET.has(payload.action)) {
+    const generated = await callGenerationModel(payload, apiKey);
+    return { generated };
   }
 
   const plainText = clip(stripHtml(payload.htmlContent));
