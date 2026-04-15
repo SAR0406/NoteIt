@@ -7,6 +7,8 @@ import Highlight from '@tiptap/extension-highlight';
 import Underline from '@tiptap/extension-underline';
 import { TextStyle } from '@tiptap/extension-text-style';
 import Link from '@tiptap/extension-link';
+import TiptapImage from '@tiptap/extension-image';
+import NextImage from 'next/image';
 import { useStore } from '@/store/useStore';
 import {
   Bold, Italic, Underline as UnderlineIcon, Highlighter, List, ListOrdered,
@@ -25,6 +27,16 @@ import { FloatingToolbar, PillButton, SplitPane, TimelineRail } from '@/componen
 
 type AIAction = 'summarize' | 'flashcards' | 'quiz' | 'diagram' | 'image-convert' | '3d';
 type GenerationModel = 'black-forest-labs/flux.2-klein-4b' | 'microsoft/trellis';
+type AIState = 'idle' | 'queued' | 'generating' | 'success' | 'retry' | 'fallback' | 'error';
+
+interface GeneratedImageItem {
+  id: string;
+  src: string;
+  model: string;
+  prompt: string;
+  action: Extract<AIAction, 'diagram' | 'image-convert' | '3d'>;
+  assetUrl?: string;
+}
 
 export function NoteEditor() {
   const {
@@ -44,9 +56,10 @@ export function NoteEditor() {
   const [editingTitle, setEditingTitle] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
   const [splitMode, setSplitMode] = useState(false);
-  const [aiState, setAiState] = useState<'idle' | 'queued' | 'generating' | 'success' | 'retry' | 'fallback' | 'error'>('idle');
+  const [aiState, setAiState] = useState<AIState>('idle');
+  const [generatedImages, setGeneratedImages] = useState<GeneratedImageItem[]>([]);
 
-  const getAiStatusLabel = (state: 'idle' | 'queued' | 'generating' | 'success' | 'retry' | 'fallback' | 'error') => {
+  const getAiStatusLabel = (state: AIState) => {
     if (state === 'success') return 'received and saved on this device';
     if (state === 'fallback') return 'saved on this device (local fallback)';
     return state;
@@ -59,6 +72,7 @@ export function NoteEditor() {
         Highlight.configure({ multicolor: false }),
         Underline,
         TextStyle,
+        TiptapImage,
         Link.configure({ openOnClick: false, HTMLAttributes: { class: 'text-blue-600 underline' } }),
       ],
       content: note?.content ?? '',
@@ -70,6 +84,24 @@ export function NoteEditor() {
       editorProps: {
         attributes: {
           class: 'prose prose-sm max-w-none focus:outline-none min-h-[420px] px-1',
+        },
+        handleDrop: (view, event) => {
+          const data = event.dataTransfer;
+          if (!data) return false;
+          const imageUrl =
+            data.getData('application/x-noteit-generated-image') ||
+            data.getData('text/uri-list') ||
+            data.getData('text/plain');
+          if (!imageUrl || (!imageUrl.startsWith('https://') && !imageUrl.startsWith('http://') && !imageUrl.startsWith('data:image/'))) {
+            return false;
+          }
+          const imageNode = view.state.schema.nodes.image?.create({ src: imageUrl, alt: 'Generated AI image' });
+          if (!imageNode) return false;
+          event.preventDefault();
+          const position = view.posAtCoords({ left: event.clientX, top: event.clientY })?.pos ?? view.state.selection.to;
+          const transaction = view.state.tr.insert(position, imageNode);
+          view.dispatch(transaction);
+          return true;
         },
       },
     },
@@ -92,6 +124,15 @@ export function NoteEditor() {
     if (action === 'summarize') summarizeNote(note.id);
     else if (action === 'flashcards') generateFlashcardsFromNote(note.id);
     else generateQuizFromNote(note.id);
+  };
+
+  const addGeneratedImage = (entry: Omit<GeneratedImageItem, 'id'>) => {
+    const id = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    setGeneratedImages((prev) => [{ id, ...entry }, ...prev].slice(0, 8));
+  };
+
+  const insertGeneratedImageInNote = (src: string) => {
+    editor?.chain().focus().setImage({ src, alt: 'Generated AI image' }).run();
   };
 
   const toSafeUrl = (value?: string) => {
@@ -207,6 +248,16 @@ export function NoteEditor() {
             setAiState('fallback');
             toast.error('Generation completed but no preview URL was returned.');
           } else {
+          if (safePreview) {
+            addGeneratedImage({
+              src: safePreview,
+              model: data.generated?.model ?? model,
+              prompt,
+              action,
+              assetUrl: safeAsset || undefined,
+            });
+            insertGeneratedImageInNote(safePreview);
+          }
           const titleByAction: Record<'diagram' | 'image-convert' | '3d', string> = {
             diagram: '🖼️ AI Diagram/Photo Generation',
             'image-convert': '🎨 AI Image Conversion',
@@ -473,6 +524,41 @@ export function NoteEditor() {
                 AI status: {aiLoading ? 'generating' : getAiStatusLabel(aiState).replace(/-/g, ' ')}
               </span>
             )}
+          </div>
+        )}
+        {generatedImages.length > 0 && (
+          <div className="mt-2 rounded-xl border border-[var(--border)] bg-[var(--surface-muted)] p-2">
+            <p className="text-[11px] text-[var(--text-muted)] px-1 mb-2">
+              Generated image panel — drag an image into the note editor or click to insert.
+            </p>
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {generatedImages.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  draggable
+                  onDragStart={(event) => {
+                    event.dataTransfer.setData('application/x-noteit-generated-image', item.src);
+                    event.dataTransfer.setData('text/plain', item.src);
+                    event.dataTransfer.setData('text/uri-list', item.src);
+                    event.dataTransfer.effectAllowed = 'copy';
+                  }}
+                  onClick={() => insertGeneratedImageInNote(item.src)}
+                  className="min-w-[120px] max-w-[120px] text-left rounded-lg border border-[var(--border)] bg-white p-1 hover:border-[var(--primary-500)]"
+                  title={`Model: ${item.model}`}
+                >
+                  <NextImage
+                    src={item.src}
+                    alt={`Generated ${item.action}`}
+                    width={120}
+                    height={80}
+                    unoptimized
+                    className="h-20 w-full object-cover rounded"
+                  />
+                  <span className="block text-[10px] text-[var(--text-secondary)] mt-1 truncate">{item.action}</span>
+                </button>
+              ))}
+            </div>
           </div>
         )}
       </div>
