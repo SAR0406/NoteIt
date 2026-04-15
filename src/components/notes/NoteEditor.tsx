@@ -44,7 +44,13 @@ export function NoteEditor() {
   const [editingTitle, setEditingTitle] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
   const [splitMode, setSplitMode] = useState(false);
-  const [aiState, setAiState] = useState<'idle' | 'queued' | 'generating' | 'success' | 'partial-success' | 'retry' | 'fallback' | 'error'>('idle');
+  const [aiState, setAiState] = useState<'idle' | 'queued' | 'generating' | 'success' | 'retry' | 'fallback' | 'error'>('idle');
+
+  const getAiStatusLabel = (state: 'idle' | 'queued' | 'generating' | 'success' | 'retry' | 'fallback' | 'error') => {
+    if (state === 'success') return 'received and saved on this device';
+    if (state === 'fallback') return 'saved on this device (local fallback)';
+    return state;
+  };
 
   const editor = useEditor(
     {
@@ -191,8 +197,7 @@ export function NoteEditor() {
             toast.success(`${action === 'quiz' ? 'Quiz' : 'Flashcards'} generated (local fallback)`);
           } else {
             cards.forEach((card) => addFlashcard(card.front, card.back, note.id, note.tags));
-            const expected = action === 'quiz' ? AI_QUIZ_CARD_LIMIT : AI_FLASHCARD_CARD_LIMIT;
-            setAiState(cards.length < expected ? 'partial-success' : 'success');
+            setAiState('success');
             toast.success(`NVIDIA NIM ${action === 'quiz' ? 'quiz cards' : 'flashcards'} generated!`);
           }
         } else {
@@ -216,7 +221,7 @@ export function NoteEditor() {
             safeAsset ? `<p><a href="${escapeHtml(safeAsset)}" target="_blank" rel="noreferrer">Open generated asset</a></p>` : '',
             ].join('');
             updateNote(note.id, { content: `${note.content}<hr>${resultHtml}` });
-            setAiState(safePreview && safeAsset ? 'success' : 'partial-success');
+            setAiState('success');
             toast.success(action === '3d' ? 'Trellis 3D generation added to note!' : 'FLUX generation result added to note!');
           }
         }
@@ -464,8 +469,8 @@ export function NoteEditor() {
               </>
             )}
             {(aiLoading || aiState !== 'idle') && (
-              <span className={`chip ${aiState === 'success' || aiState === 'partial-success' ? 'chip-active' : ''}`}>
-                AI status: {aiLoading ? 'generating' : aiState.replace(/-/g, ' ')}
+              <span className={`chip ${aiState === 'success' ? 'chip-active' : ''}`}>
+                AI status: {aiLoading ? 'generating' : getAiStatusLabel(aiState).replace(/-/g, ' ')}
               </span>
             )}
           </div>
