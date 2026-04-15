@@ -38,6 +38,8 @@ interface GeneratedImageItem {
   assetUrl?: string;
 }
 
+const GENERATED_AI_IMAGE_ALT = 'Generated AI image';
+
 export function NoteEditor() {
   const {
     notes, selectedNoteId, updateNote, deleteNote, toggleFavorite, togglePin,
@@ -95,7 +97,7 @@ export function NoteEditor() {
           if (!imageUrl || !isValidImageUrl(imageUrl)) {
             return false;
           }
-          const imageNode = view.state.schema.nodes.image?.create({ src: imageUrl, alt: 'Generated AI image' });
+          const imageNode = view.state.schema.nodes.image?.create({ src: imageUrl, alt: GENERATED_AI_IMAGE_ALT });
           if (!imageNode) return false;
           event.preventDefault();
           const position = view.posAtCoords({ left: event.clientX, top: event.clientY })?.pos ?? view.state.selection.to;
@@ -130,12 +132,14 @@ export function NoteEditor() {
     value.startsWith('https://') || value.startsWith('http://') || value.startsWith('data:image/');
 
   const addGeneratedImage = (entry: Omit<GeneratedImageItem, 'id'>) => {
+    if (!isValidImageUrl(entry.src)) return;
     const id = crypto.randomUUID();
     setGeneratedImages((prev) => [{ id, ...entry }, ...prev].slice(0, 8));
   };
 
   const insertGeneratedImageInNote = (src: string) => {
-    editor?.chain().focus().setImage({ src, alt: 'Generated AI image' }).run();
+    if (!isValidImageUrl(src)) return;
+    editor?.chain().focus().setImage({ src, alt: GENERATED_AI_IMAGE_ALT }).run();
   };
 
   const toSafeUrl = (value?: string) => {
@@ -552,7 +556,7 @@ export function NoteEditor() {
                 >
                   <NextImage
                     src={item.src}
-                    alt={`Generated ${item.action}`}
+                    alt={`${GENERATED_AI_IMAGE_ALT} (${item.action})`}
                     width={120}
                     height={80}
                     unoptimized
