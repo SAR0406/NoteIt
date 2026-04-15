@@ -92,7 +92,7 @@ export function NoteEditor() {
             data.getData('application/x-noteit-generated-image') ||
             data.getData('text/uri-list') ||
             data.getData('text/plain');
-          if (!imageUrl || (!imageUrl.startsWith('https://') && !imageUrl.startsWith('http://') && !imageUrl.startsWith('data:image/'))) {
+          if (!imageUrl || !isValidImageUrl(imageUrl)) {
             return false;
           }
           const imageNode = view.state.schema.nodes.image?.create({ src: imageUrl, alt: 'Generated AI image' });
@@ -126,8 +126,11 @@ export function NoteEditor() {
     else generateQuizFromNote(note.id);
   };
 
+  const isValidImageUrl = (value: string) =>
+    value.startsWith('https://') || value.startsWith('http://') || value.startsWith('data:image/');
+
   const addGeneratedImage = (entry: Omit<GeneratedImageItem, 'id'>) => {
-    const id = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    const id = crypto.randomUUID();
     setGeneratedImages((prev) => [{ id, ...entry }, ...prev].slice(0, 8));
   };
 
@@ -138,7 +141,7 @@ export function NoteEditor() {
   const toSafeUrl = (value?: string) => {
     if (!value) return '';
     const normalized = value.trim();
-    if (normalized.startsWith('https://') || normalized.startsWith('http://') || normalized.startsWith('data:image/')) {
+    if (isValidImageUrl(normalized)) {
       return normalized;
     }
     return '';
