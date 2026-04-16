@@ -165,7 +165,7 @@ export function NoteEditor() {
 
   if (!note) {
     return (
-      <div className={`flex-1 flex flex-col items-center justify-center relative overflow-hidden ${THEMES[activeTheme]}`}>
+      <div className={`flex-1 flex flex-col items-center justify-center relative overflow-hidden ${THEMES[activeTheme]}`}>  
         <div className="absolute inset-0 flex items-center justify-center opacity-[0.03] pointer-events-none"><Orbit size={800} strokeWidth={0.5}/></div>
         <div className="relative w-32 h-32 bg-white/5 backdrop-blur-xl border border-white/10 shadow-2xl shadow-indigo-500/20 rounded-[40px] flex items-center justify-center mb-10 transform hover:scale-110 transition-transform duration-500 group">
           <div className="absolute inset-0 bg-gradient-to-tr from-indigo-500 to-purple-500 rounded-[40px] opacity-0 group-hover:opacity-20 transition-opacity duration-700"></div>
@@ -191,15 +191,14 @@ export function NoteEditor() {
   };
 
   return (
-    <div className={`flex-1 flex flex-col overflow-hidden relative selection:bg-indigo-500/30 selection:text-indigo-200 transition-colors duration-500 ${THEMES[activeTheme]}`}>
-      
+    <div className={`flex-1 flex flex-col overflow-hidden relative selection:bg-indigo-500/30 selection:text-indigo-200 transition-colors duration-500 ${THEMES[activeTheme]}`}>  
       {/* 🔮 AMBIENT BACKGROUND GLOWS */}
       <div className="fixed top-0 left-1/4 w-[800px] h-[800px] bg-indigo-500/20 rounded-full blur-[150px] pointer-events-none mix-blend-screen opacity-60 animate-pulse" style={{ animationDuration: '8s' }}></div>
       <div className="fixed bottom-0 right-1/4 w-[600px] h-[600px] bg-purple-500/20 rounded-full blur-[120px] pointer-events-none mix-blend-screen opacity-60 animate-pulse" style={{ animationDuration: '12s' }}></div>
 
       {/* ⚡ GLASS TOP NAVBAR */}
-      <div className={`h-16 backdrop-blur-3xl border-b flex items-center px-8 justify-between shrink-0 z-40 sticky top-0 transition-all duration-500 ${focusMode ? '-translate-y-full opacity-0 absolute w-full' : ''} ${isDark ? 'border-white/5 bg-black/20' : 'border-black/5 bg-white/20'}`}>
-        <div className={`flex items-center gap-6 text-sm font-bold ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+      <div className={`h-16 backdrop-blur-3xl border-b flex items-center px-8 justify-between shrink-0 z-40 sticky top-0 transition-all duration-500 ${focusMode ? '-translate-y-full opacity-0 absolute w-full' : ''} ${isDark ? 'border-white/5 bg-black/20' : 'border-black/5 bg-white/20'}`}>  
+        <div className={`flex items-center gap-6 text-sm font-bold ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>  
           <span className="flex items-center gap-2"><Clock size={16} className="text-indigo-400"/> {readingTime} min</span>
           <span className="flex items-center gap-2"><Hash size={16} className="text-emerald-400"/> {wordCount} words</span>
           {aiState !== 'idle' && (
@@ -210,33 +209,33 @@ export function NoteEditor() {
         </div>
 
         <div className="flex items-center gap-3">
-          <button onClick={() => setFocusMode(true)} className={`p-2.5 rounded-xl backdrop-blur-md shadow-sm border transition-all hover:scale-105 ${isDark ? 'bg-white/5 text-gray-400 border-white/10 hover:text-white' : 'bg-black/5 text-gray-500 border-black/10 hover:text-black'}`}>
+          <button onClick={() => setFocusMode(true)} className={`p-2.5 rounded-xl backdrop-blur-md shadow-sm border transition-all hover:scale-105 ${isDark ? 'bg-white/5 text-gray-400 border-white/10 hover:text-white' : 'bg-black/5 text-gray-500 border-black/10 hover:text-black'}`}>  
             <Maximize size={18} />
           </button>
-          <button onClick={() => setSplitMode(!splitMode)} className={`p-2.5 rounded-xl backdrop-blur-md transition-all hover:scale-105 ${splitMode ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/30 border-transparent' : isDark ? 'bg-white/5 text-gray-400 border-white/10 hover:text-white' : 'bg-black/5 text-gray-500 border-black/10 hover:text-black'}`}>
+          <button onClick={() => setSplitMode(!splitMode)} className={`p-2.5 rounded-xl backdrop-blur-md transition-all hover:scale-105 ${splitMode ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/30 border-transparent' : isDark ? 'bg-white/5 text-gray-400 border-white/10 hover:text-white' : 'bg-black/5 text-gray-500 border-black/10 hover:text-black'}`}>  
             <LayoutGrid size={18} />
           </button>
           <div className="relative">
-            <button onClick={() => setShowSettings(!showSettings)} className={`p-2.5 rounded-xl backdrop-blur-md shadow-sm border transition-all hover:scale-105 ${isDark ? 'bg-white/5 text-gray-400 border-white/10 hover:text-white' : 'bg-black/5 text-gray-500 border-black/10 hover:text-black'}`}>
+            <button onClick={() => setShowSettings(!showSettings)} className={`p-2.5 rounded-xl backdrop-blur-md shadow-sm border transition-all hover:scale-105 ${isDark ? 'bg-white/5 text-gray-400 border-white/10 hover:text-white' : 'bg-black/5 text-gray-500 border-black/10 hover:text-black'}`}>  
               <Settings2 size={18} />
             </button>
             {showSettings && (
-              <div className={`absolute right-0 top-full mt-4 w-[360px] backdrop-blur-3xl border shadow-[0_40px_80px_-20px_rgba(0,0,0,0.5)] rounded-[32px] p-6 z-50 animate-in slide-in-from-top-4 duration-300 ${isDark ? 'bg-[#1a1a1a]/90 border-white/10' : 'bg-white/90 border-black/10'}`}>
+              <div className={`absolute right-0 top-full mt-4 w-[360px] backdrop-blur-3xl border shadow-[0_40px_80px_-20px_rgba(0,0,0,0.5)] rounded-[32px] p-6 z-50 animate-in slide-in-from-top-4 duration-300 ${isDark ? 'bg-[#1a1a1a]/90 border-white/10' : 'bg-white/90 border-black/10'}`}>  
                 <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-4">Canvas Matrix</p>
-                <div className="grid grid-cols-5 gap-3 mb-6">
+                <div className="grid grid-cols-5 gap-3 mb-6">  
                   {(['blank', 'dots', 'grid', 'lines', 'blueprint'] as const).map(bg => (
-                    <button key={bg} onClick={() => setPageBg(bg)} className={`aspect-square rounded-2xl flex justify-center items-center transition-all duration-300 ${pageBg === bg ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/40 scale-110' : isDark ? 'bg-white/5 text-gray-400 hover:bg-white/10' : 'bg-black/5 text-gray-500 hover:bg-black/10'}`}>
-                      {bg === 'blank' ? <FileText size={20}/> : bg === 'blueprint' ? <Layers size={20}/> : bg === 'dots' ? <LayoutGrid size={20}/> : bg === 'grid' ? <GripHorizontal size={20}/> : <List size={20}/>}
+                    <button key={bg} onClick={() => setPageBg(bg)} className={`aspect-square rounded-2xl flex justify-center items-center transition-all duration-300 ${pageBg === bg ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/40 scale-110' : isDark ? 'bg-white/5 text-gray-400 hover:bg-white/10' : 'bg-black/5 text-gray-500 hover:bg-black/10'}`}>  
+                      {bg === 'blank' ? <FileText size={20}/> : bg === 'blueprint' ? <Layers size={20}/> : bg === 'dots' ? <LayoutGrid size={20}/> : bg === 'grid' ? <GripHorizontal size={20}/> : <List size={20}/>}  
                     </button>
                   ))}
                 </div>
                 <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-4">Theme Engine</p>
-                <div className="flex gap-2 mb-6">
+                <div className="flex gap-2 mb-6">  
                   <button onClick={() => setActiveTheme('light')} className={`flex-1 py-2.5 text-xs font-bold rounded-xl border transition-all ${activeTheme === 'light' ? 'bg-white text-black border-gray-200 shadow-md' : 'bg-transparent text-gray-500 border-gray-200/20'}`}>Light</button>
                   <button onClick={() => setActiveTheme('dim')} className={`flex-1 py-2.5 text-xs font-bold rounded-xl border transition-all ${activeTheme === 'dim' ? 'bg-[#121212] text-white border-white/20 shadow-md' : 'bg-transparent text-gray-500 border-white/10'}`}>Dim</button>
                   <button onClick={() => setActiveTheme('sepia')} className={`flex-1 py-2.5 text-xs font-bold rounded-xl border transition-all ${activeTheme === 'sepia' ? 'bg-[#FBF0D9] text-[#5C4B37] border-[#5C4B37]/20 shadow-md' : 'bg-transparent text-gray-500 border-gray-200/20'}`}>Sepia</button>
                 </div>
-                <div className="flex gap-3">
+                <div className="flex gap-3">  
                   <button onClick={() => setFullWidth(false)} className={`flex-1 py-3 text-sm font-bold rounded-2xl transition-all border ${!fullWidth ? 'bg-white/10 text-white border-white/20 shadow-xl' : 'bg-transparent text-gray-500 border-transparent hover:bg-white/5'}`}>Centered</button>
                   <button onClick={() => setFullWidth(true)} className={`flex-1 py-3 text-sm font-bold rounded-2xl transition-all border ${fullWidth ? 'bg-white/10 text-white border-white/20 shadow-xl' : 'bg-transparent text-gray-500 border-transparent hover:bg-white/5'}`}>Full Width</button>
                 </div>
@@ -247,32 +246,29 @@ export function NoteEditor() {
 
         {/* FOCUS MODE EXIT OVERLAY */}
         {focusMode && (
-          <button onClick={() => setFocusMode(false)} className="fixed top-8 right-8 z-[200] p-4 bg-white/10 backdrop-blur-2xl border border-white/20 text-white rounded-full hover:bg-white/20 hover:scale-110 transition-all shadow-2xl">
+          <button onClick={() => setFocusMode(false)} className="fixed top-8 right-8 z-[200] p-4 bg-white/10 backdrop-blur-2xl border border-white/20 text-white rounded-full hover:bg-white/20 hover:scale-110 transition-all shadow-2xl">  
             <Minimize2 size={24} />
           </button>
-        )}
+        )}  
        </div> {/* ✅ CLOSE TOP NAVBAR DIV HERE */}
-      <div className="flex-1 flex overflow-hidden relative">
+      <div className="flex-1 flex overflow-hidden relative">  
         {/* 📜 MAIN INFINITE CANVAS SCROLL AREA */}
-        <div className={`flex-1 overflow-y-auto relative scroll-smooth scrollbar-hide transition-all duration-700 ease-[cubic-bezier(0.23,1,0.32,1)] ${pageBg === 'blueprint' ? bgStyles.blueprint : isDark ? 'bg-transparent' : 'bg-transparent'} ${bgStyles[pageBg]}`}>
-          
+        <div className={`flex-1 overflow-y-auto relative scroll-smooth scrollbar-hide transition-all duration-700 ease-[cubic-bezier(0.23,1,0.32,1)] ${pageBg === 'blueprint' ? bgStyles.blueprint : isDark ? 'bg-transparent' : 'bg-transparent'} ${bgStyles[pageBg]}`}>  
           {/* CINEMATIC COVER IMAGE */}
-          <div className="relative group">
+          <div className="relative group">  
             {coverImage !== 'none' ? (
-              <div className={`h-[45vh] w-full relative overflow-hidden ${focusMode ? 'h-[25vh]' : ''} transition-all duration-[1.5s] ease-[cubic-bezier(0.23,1,0.32,1)]`}>
+              <div className={`h-[45vh] w-full relative overflow-hidden ${focusMode ? 'h-[25vh]' : ''} transition-all duration-[1.5s] ease-[cubic-bezier(0.23,1,0.32,1)]`}>  
                 <img src={coverImage} alt="Cover" className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-[3s] ease-out" />
                 <div className={`absolute inset-0 bg-gradient-to-b from-transparent via-[#121212]/20 ${isDark ? 'to-[#121212]' : activeTheme === 'sepia' ? 'to-[#FBF0D9]' : 'to-[#FCFCFC]'}`}></div>
               </div>
-            ) : <div className="h-40 w-full bg-transparent"></div>}
-            
-            <button onClick={() => setShowCoverPicker(!showCoverPicker)} className="absolute top-8 right-8 px-5 py-2.5 bg-black/40 hover:bg-black/60 backdrop-blur-xl border border-white/20 rounded-full text-white text-sm font-bold opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center gap-2 shadow-2xl hover:scale-105">
+            ) : <div className="h-40 w-full bg-transparent"></div>}  
+            <button onClick={() => setShowCoverPicker(!showCoverPicker)} className="absolute top-8 right-8 px-5 py-2.5 bg-black/40 hover:bg-black/60 backdrop-blur-xl border border-white/20 rounded-full text-white text-sm font-bold opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center gap-2 shadow-2xl hover:scale-105">  
               <Palette size={16}/> Change Cover
-            </button>
-            
+            </button>  
             {showCoverPicker && (
-              <div className={`absolute right-8 top-20 w-96 backdrop-blur-3xl border shadow-2xl rounded-[32px] p-4 z-50 grid grid-cols-2 gap-3 animate-in zoom-in-95 duration-300 ${isDark ? 'bg-[#1a1a1a]/90 border-white/10' : 'bg-white/90 border-black/10'}`}>
+              <div className={`absolute right-8 top-20 w-96 backdrop-blur-3xl border shadow-2xl rounded-[32px] p-4 z-50 grid grid-cols-2 gap-3 animate-in zoom-in-95 duration-300 ${isDark ? 'bg-[#1a1a1a]/90 border-white/10' : 'bg-white/90 border-black/10'}`}>  
                 {COVER_IMAGES.map((img, i) => (
-                  <button key={i} onClick={() => { setCoverImage(img); setShowCoverPicker(false); }} className={`h-24 rounded-2xl overflow-hidden border-[3px] transition-all ${coverImage === img ? 'border-indigo-500 scale-95' : 'border-transparent hover:scale-105 hover:shadow-xl'}`}>
+                  <button key={i} onClick={() => { setCoverImage(img); setShowCoverPicker(false); }} className={`h-24 rounded-2xl overflow-hidden border-[3px] transition-all ${coverImage === img ? 'border-indigo-500 scale-95' : 'border-transparent hover:scale-105 hover:shadow-xl'}`}>  
                     {img === 'none' ? <div className={`w-full h-full flex items-center justify-center font-bold ${isDark ? 'bg-white/5 text-gray-500' : 'bg-black/5 text-gray-400'}`}>Minimal</div> : <img src={img} alt="cover" className="w-full h-full object-cover" />}
                   </button>
                 ))}
@@ -281,48 +277,46 @@ export function NoteEditor() {
           </div>
 
           {/* THE PAPER */}
-          <div className={`relative z-10 mx-auto ${fullWidth ? 'max-w-[95%]' : 'max-w-[1200px]'} transition-all duration-1000 ease-[cubic-bezier(0.23,1,0.32,1)]`}>
-            
-            <div className="relative -mt-28 ml-12 mb-12 inline-block z-20">
-              <button onClick={() => setShowEmojiPicker(!showEmojiPicker)} className="text-[120px] leading-none drop-shadow-[0_20px_40px_rgba(0,0,0,0.3)] hover:scale-110 hover:-rotate-12 transition-transform duration-500 select-none">
+          <div className={`relative z-10 mx-auto ${fullWidth ? 'max-w-[95%]' : 'max-w-[1200px]'} transition-all duration-1000 ease-[cubic-bezier(0.23,1,0.32,1)]`}>  
+            <div className="relative -mt-28 ml-12 mb-12 inline-block z-20">  
+              <button onClick={() => setShowEmojiPicker(!showEmojiPicker)} className="text-[120px] leading-none drop-shadow-[0_20px_40px_rgba(0,0,0,0.3)] hover:scale-110 hover:-rotate-12 transition-transform duration-500 select-none">  
                 {pageIcon}
               </button>
               {showEmojiPicker && (
-                <div className={`absolute left-0 top-full mt-4 backdrop-blur-3xl border shadow-[0_40px_80px_-20px_rgba(0,0,0,0.5)] rounded-[32px] p-5 w-[360px] grid grid-cols-5 gap-3 z-50 animate-in slide-in-from-bottom-4 duration-300 ${isDark ? 'bg-[#1a1a1a]/90 border-white/10' : 'bg-white/90 border-black/10'}`}>
-                  {EMOJI_LIST.map(emoji => <button key={emoji} onClick={() => { setPageIcon(emoji); setShowEmojiPicker(false); }} className={`text-4xl aspect-square flex items-center justify-center rounded-2xl hover:scale-125 transition-transform ${isDark ? 'hover:bg-white/10' : 'hover:bg-black/5'}`}>{emoji}</button>)}
+                <div className={`absolute left-0 top-full mt-4 backdrop-blur-3xl border shadow-[0_40px_80px_-20px_rgba(0,0,0,0.5)] rounded-[32px] p-5 w-[360px] grid grid-cols-5 gap-3 z-50 animate-in slide-in-from-bottom-4 duration-300 ${isDark ? 'bg-[#1a1a1a]/90 border-white/10' : 'bg-white/90 border-black/10'}`}>  
+                  {EMOJI_LIST.map(emoji => <button key={emoji} onClick={() => { setPageIcon(emoji); setShowEmojiPicker(false); }} className={`text-4xl aspect-square flex items-center justify-center rounded-2xl hover:scale-125 transition-transform ${isDark ? 'hover:bg-white/10' : 'hover:bg-black/5'}`}>{emoji}</button>)})
                 </div>
-              )}
+              )}  
             </div>
 
-            <div className={`bg-transparent min-h-screen`}>
-              <div className="px-16 pb-16">
+            <div className={`bg-transparent min-h-screen`}>  
+              <div className="px-16 pb-16">  
                 {editingTitle ? (
                   <input autoFocus className={`text-[6rem] font-black w-full outline-none bg-transparent placeholder-gray-500/50 tracking-tighter leading-[1.1] ${isDark ? 'text-white' : activeTheme === 'sepia' ? 'text-[#3E3224]' : 'text-gray-900'}`} value={note.title} onChange={(e) => updateNote(note.id, { title: e.target.value })} onBlur={() => setEditingTitle(false)} onKeyDown={(e) => e.key === 'Enter' && setEditingTitle(false)} placeholder="Untitled Matrix..." />
-                ) : (
+                ) : (  
                   <h1 className={`text-[6rem] font-black cursor-text hover:opacity-70 transition-opacity tracking-tighter leading-[1.1] ${isDark ? 'text-white' : activeTheme === 'sepia' ? 'text-[#3E3224]' : 'text-gray-900'}`} onClick={() => setEditingTitle(true)}>{note.title || 'Untitled Matrix'}</h1>
-                )}
+                )}  
               </div>
 
-              <div className={`px-16 pb-64 relative transition-colors duration-700`}>
-                
+              <div className={`px-16 pb-64 relative transition-colors duration-700`}>  
                 {/* Tiptap Editor Content */}
-                <EditorContent editor={editor} />
+                <EditorContent editor={editor} />  
 
                 {editor && (
-                  <BubbleMenu editor={editor} tippyOptions={{ duration: 200, animation: 'shift-away' }} className={`flex overflow-hidden backdrop-blur-3xl border shadow-[0_20px_40px_rgba(0,0,0,0.2)] rounded-3xl p-1.5 ${isDark ? 'bg-[#1e1e1e]/90 border-white/10' : 'bg-white/90 border-black/5'}`}>
+                  <BubbleMenu editor={editor} className={`flex overflow-hidden backdrop-blur-3xl border shadow-[0_20px_40px_rgba(0,0,0,0.2)] rounded-3xl p-1.5 ${isDark ? 'bg-[#1e1e1e]/90 border-white/10' : 'bg-white/90 border-black/5'}`}>  
                     <ToolbarBtn onClick={() => editor.chain().focus().toggleBold().run()} active={editor.isActive('bold')} isDark={isDark}><Bold size={18} /></ToolbarBtn>
                     <ToolbarBtn onClick={() => editor.chain().focus().toggleItalic().run()} active={editor.isActive('italic')} isDark={isDark}><Italic size={18} /></ToolbarBtn>
                     <div className={`w-px mx-1.5 my-2 ${isDark ? 'bg-white/10' : 'bg-black/10'}`}></div>
                     <ToolbarBtn onClick={() => handleAI('summarize')} isDark={isDark}><Wand2 size={18} className="text-indigo-400"/></ToolbarBtn>
                   </BubbleMenu>
-                )}
+                )}  
 
                 {/* BENTO GRID: DRAWING & HANDWRITING */}
-                <div className="mt-48 grid grid-cols-1 xl:grid-cols-2 gap-12 relative z-10 pb-40">
+                <div className="mt-48 grid grid-cols-1 xl:grid-cols-2 gap-12 relative z-10 pb-40">  
                   {/* Drawing Board */}
-                  <div className={`backdrop-blur-3xl rounded-[56px] p-12 shadow-[0_20px_80px_rgba(0,0,0,0.1)] border transition-all duration-700 ease-out flex flex-col group hover:-translate-y-4 hover:shadow-[0_40px_100px_rgba(0,0,0,0.2)] ${isDark ? 'bg-white/[0.02] border-white/5' : 'bg-black/[0.02] border-black/5'}`}>
-                    <div className="flex items-center justify-between mb-10">
-                      <div className="flex items-center gap-6">
+                  <div className={`backdrop-blur-3xl rounded-[56px] p-12 shadow-[0_20px_80px_rgba(0,0,0,0.1)] border transition-all duration-700 ease-out flex flex-col group hover:-translate-y-4 hover:shadow-[0_40px_100px_rgba(0,0,0,0.2)] ${isDark ? 'bg-white/[0.02] border-white/5' : 'bg-black/[0.02] border-black/5'}`}>  
+                    <div className="flex items-center justify-between mb-10">  
+                      <div className="flex items-center gap-6">  
                         <div className="w-20 h-20 bg-gradient-to-br from-pink-500 to-rose-600 text-white rounded-[28px] shadow-2xl shadow-pink-500/40 flex items-center justify-center group-hover:scale-110 group-hover:rotate-12 transition-all duration-500"><PenTool size={36} /></div>
                         <div>
                           <h3 className={`text-3xl font-black tracking-tight ${isDark ? 'text-white' : 'text-gray-900'}`}>Freeform Board</h3>
@@ -331,8 +325,8 @@ export function NoteEditor() {
                       </div>
                       <button className={`p-4 rounded-3xl transition-all hover:scale-110 ${isDark ? 'bg-white/5 hover:bg-white/10 text-white' : 'bg-black/5 hover:bg-black/10 text-black'}`}><Maximize2 size={24} /></button>
                     </div>
-                    <div className={`ring-1 rounded-[40px] overflow-hidden shadow-inner flex-1 min-h-[600px] relative ${isDark ? 'bg-black/40 ring-white/10' : 'bg-white/80 ring-black/5'}`}>
-                      <div className={`absolute left-6 top-1/2 -translate-y-1/2 backdrop-blur-2xl shadow-2xl border rounded-[28px] p-3 flex flex-col gap-3 z-20 ${isDark ? 'bg-[#1a1a1a]/80 border-white/10' : 'bg-white/80 border-black/5'}`}>
+                    <div className={`ring-1 rounded-[40px] overflow-hidden shadow-inner flex-1 min-h-[600px] relative ${isDark ? 'bg-black/40 ring-white/10' : 'bg-white/80 ring-black/5'}`}>  
+                      <div className={`absolute left-6 top-1/2 -translate-y-1/2 backdrop-blur-2xl shadow-2xl border rounded-[28px] p-3 flex flex-col gap-3 z-20 ${isDark ? 'bg-[#1a1a1a]/80 border-white/10' : 'bg-white/80 border-black/5'}`}>  
                         <button className="p-3.5 bg-indigo-500/20 text-indigo-400 rounded-2xl hover:scale-110 transition-transform"><MousePointer2 size={22}/></button>
                         <button className={`p-3.5 rounded-2xl hover:scale-110 transition-transform ${isDark ? 'text-gray-400 hover:bg-white/10' : 'text-gray-500 hover:bg-black/5'}`}><PenTool size={22}/></button>
                         <button className={`p-3.5 rounded-2xl hover:scale-110 transition-transform ${isDark ? 'text-gray-400 hover:bg-white/10' : 'text-gray-500 hover:bg-black/5'}`}><Shapes size={22}/></button>
@@ -343,9 +337,9 @@ export function NoteEditor() {
                   </div>
 
                   {/* OCR Pad */}
-                  <div className={`backdrop-blur-3xl rounded-[56px] p-12 shadow-[0_20px_80px_rgba(0,0,0,0.1)] border transition-all duration-700 ease-out flex flex-col group hover:-translate-y-4 hover:shadow-[0_40px_100px_rgba(0,0,0,0.2)] ${isDark ? 'bg-white/[0.02] border-white/5' : 'bg-black/[0.02] border-black/5'}`}>
-                    <div className="flex items-center justify-between mb-10">
-                      <div className="flex items-center gap-6">
+                  <div className={`backdrop-blur-3xl rounded-[56px] p-12 shadow-[0_20px_80px_rgba(0,0,0,0.1)] border transition-all duration-700 ease-out flex flex-col group hover:-translate-y-4 hover:shadow-[0_40px_100px_rgba(0,0,0,0.2)] ${isDark ? 'bg-white/[0.02] border-white/5' : 'bg-black/[0.02] border-black/5'}`}>  
+                    <div className="flex items-center justify-between mb-10">  
+                      <div className="flex items-center gap-6">  
                         <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-indigo-600 text-white rounded-[28px] shadow-2xl shadow-blue-500/40 flex items-center justify-center group-hover:scale-110 group-hover:-rotate-12 transition-all duration-500"><Brain size={36} /></div>
                         <div>
                           <h3 className={`text-3xl font-black tracking-tight ${isDark ? 'text-white' : 'text-gray-900'}`}>Cognitive OCR</h3>
@@ -354,7 +348,7 @@ export function NoteEditor() {
                       </div>
                       <button className={`p-4 rounded-3xl transition-all hover:scale-110 ${isDark ? 'bg-white/5 hover:bg-white/10 text-white' : 'bg-black/5 hover:bg-black/10 text-black'}`}><Maximize2 size={24} /></button>
                     </div>
-                    <div className={`ring-1 rounded-[40px] overflow-hidden shadow-inner flex-1 min-h-[600px] ${isDark ? 'bg-black/40 ring-white/10' : 'bg-white/80 ring-black/5'}`}>
+                    <div className={`ring-1 rounded-[40px] overflow-hidden shadow-inner flex-1 min-h-[600px] ${isDark ? 'bg-black/40 ring-white/10' : 'bg-white/80 ring-black/5'}`}>  
                       <HandwritingPad note={note} />
                     </div>
                   </div>
@@ -362,112 +356,104 @@ export function NoteEditor() {
               </div>
             </div>
           </div>
-        </div>
 
-        {/* 📂 SPLIT MODE BENTO SIDEBAR */}
-        {splitMode && !focusMode && (
-          <div className={`w-[480px] border-l backdrop-blur-3xl p-10 overflow-y-auto z-30 shadow-[-40px_0_80px_-20px_rgba(0,0,0,0.2)] flex flex-col gap-8 animate-in slide-in-from-right-12 duration-500 ${isDark ? 'bg-black/40 border-white/5' : 'bg-white/60 border-black/5'}`}>
-            <div className={`backdrop-blur-2xl rounded-[48px] p-10 shadow-2xl border ${isDark ? 'bg-white/5 border-white/10' : 'bg-white/80 border-white'}`}>
-              <h3 className={`text-2xl font-black mb-8 flex items-center gap-4 ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                <div className="p-3 bg-indigo-500/20 rounded-2xl text-indigo-400"><Layers size={28} /></div>
-                Document Cortex
-              </h3>
-              <DocumentWorkspace note={note} compact />
-            </div>
-          </div>
-        )}
-
-        {/* 🛸 MAC-OS STYLE FLOATING GLASS DOCK */}
-        <div className={`fixed bottom-12 left-1/2 -translate-x-1/2 z-[100] transition-transform duration-1000 ease-[cubic-bezier(0.23,1,0.32,1)] ${focusMode ? 'translate-y-64' : 'translate-y-0'}`}>
-          <div className={`backdrop-blur-[60px] border shadow-[0_40px_100px_-20px_rgba(0,0,0,0.5)] px-5 py-5 rounded-[48px] flex items-center gap-2 animate-in slide-in-from-bottom-24 duration-1000 ${isDark ? 'bg-[#1a1a1a]/80 border-white/10 text-white' : 'bg-white/80 border-black/5 text-gray-900'}`}>
-            <ToolbarBtn onClick={() => editor?.chain().focus().undo().run()} isDark={isDark}><Undo2 size={24} /></ToolbarBtn>
-            <div className={`w-px h-12 mx-3 ${isDark ? 'bg-white/10' : 'bg-black/10'}`} />
-            <ToolbarBtn onClick={() => editor?.chain().focus().toggleBold().run()} active={editor?.isActive('bold')} isDark={isDark}><Bold size={24} /></ToolbarBtn>
-            <ToolbarBtn onClick={() => editor?.chain().focus().toggleItalic().run()} active={editor?.isActive('italic')} isDark={isDark}><Italic size={24} /></ToolbarBtn>
-            <ToolbarBtn onClick={() => editor?.chain().focus().toggleUnderline().run()} active={editor?.isActive('underline')} isDark={isDark}><UnderlineIcon size={24} /></ToolbarBtn>
-            <div className={`w-px h-12 mx-3 ${isDark ? 'bg-white/10' : 'bg-black/10'}`} />
-            
-            {/* Color Pickers */}
-            <div className={`relative group p-4 flex items-center justify-center rounded-3xl transition-all cursor-pointer border hover:scale-110 ${isDark ? 'hover:bg-white/10 border-transparent text-gray-300' : 'hover:bg-black/5 border-transparent text-gray-600'}`}>
-              <Type size={24} />
-              <input type="color" className="absolute inset-0 opacity-0 w-full h-full cursor-pointer" onChange={(e) => editor?.chain().focus().setColor(e.target.value).run()} />
-            </div>
-            <div className={`relative group p-4 flex items-center justify-center rounded-3xl transition-all cursor-pointer border hover:scale-110 ${isDark ? 'hover:bg-white/10 border-transparent text-gray-300' : 'hover:bg-black/5 border-transparent text-gray-600'}`}>
-              <Highlighter size={24} />
-              <input type="color" defaultValue="#fef08a" className="absolute inset-0 opacity-0 w-full h-full cursor-pointer" onChange={(e) => editor?.chain().focus().toggleHighlight({ color: e.target.value }).run()} />
-            </div>
-            
-            <div className={`w-px h-12 mx-3 ${isDark ? 'bg-white/10' : 'bg-black/10'}`} />
-            <ToolbarBtn onClick={() => editor?.chain().focus().toggleHeading({ level: 1 }).run()} active={editor?.isActive('heading', { level: 1 })} isDark={isDark}><Heading1 size={24} /></ToolbarBtn>
-            <ToolbarBtn onClick={() => editor?.chain().focus().toggleHeading({ level: 2 }).run()} active={editor?.isActive('heading', { level: 2 })} isDark={isDark}><Heading2 size={24} /></ToolbarBtn>
-            <ToolbarBtn onClick={() => editor?.chain().focus().toggleBulletList().run()} active={editor?.isActive('bulletList')} isDark={isDark}><List size={24} /></ToolbarBtn>
-            <div className={`w-px h-12 mx-3 ${isDark ? 'bg-white/10' : 'bg-black/10'}`} />
-            <ToolbarBtn onClick={addImage} isDark={isDark}><ImageIcon size={24} className="text-emerald-500" /></ToolbarBtn>
-            
-            {/* The Neural AI Button */}
-            <div className="relative ml-5">
-              <button onClick={() => setShowAiMenu(!showAiMenu)} className={`flex items-center justify-center p-5 rounded-[32px] shadow-2xl transition-all duration-700 ease-[cubic-bezier(0.23,1,0.32,1)] ${showAiMenu ? 'bg-indigo-600 text-white scale-110 shadow-indigo-500/50' : 'bg-gradient-to-br from-indigo-500 to-purple-600 text-white hover:scale-110 hover:shadow-purple-500/40 hover:-translate-y-2'}`}>
-                <Wand2 size={28} className={aiState === 'generating' ? 'animate-spin' : 'animate-pulse'} />
-              </button>
-              
-              {showAiMenu && (
-                <div className={`absolute bottom-[calc(100%+40px)] left-1/2 -translate-x-1/2 w-[380px] backdrop-blur-[60px] border shadow-[0_50px_100px_-20px_rgba(0,0,0,0.5)] rounded-[48px] p-6 z-50 animate-in zoom-in-95 slide-in-from-bottom-8 duration-500 ${isDark ? 'bg-[#1a1a1a]/90 border-white/10' : 'bg-white/90 border-black/5'}`}>
-                  <div className="p-2">
-                    <p className="text-[12px] text-gray-500 font-black tracking-[0.25em] uppercase mb-5 px-3">Neural Operations</p>
-                    <button onClick={() => { handleAI('summarize'); setShowAiMenu(false); }} className={`w-full text-left text-base font-bold px-6 py-5 rounded-[28px] flex items-center gap-5 transition-all hover:scale-105 ${isDark ? 'bg-white/5 hover:bg-white/10 text-white' : 'bg-black/5 hover:bg-black/10 text-black'}`}><AlignLeft size={22} className="text-blue-400"/> Executive Synthesis</button>
-                    <button onClick={() => { handleAI('flashcards'); setShowAiMenu(false); }} className={`w-full text-left text-base font-bold px-6 py-5 rounded-[28px] flex items-center gap-5 transition-all mt-3 hover:scale-105 ${isDark ? 'bg-white/5 hover:bg-white/10 text-white' : 'bg-black/5 hover:bg-black/10 text-black'}`}><Brain size={22} className="text-pink-400"/> Extract Flashcards</button>
-                    <div className={`h-px my-6 mx-5 ${isDark ? 'bg-white/10' : 'bg-black/10'}`} />
-                    <p className="text-[12px] text-gray-500 font-black tracking-[0.25em] uppercase mb-5 px-3">Visual Synthesis</p>
-                    <button onClick={() => { handleAI('diagram'); setShowAiMenu(false); }} className={`w-full text-left text-base font-bold px-6 py-5 rounded-[28px] flex items-center gap-5 transition-all hover:scale-105 ${isDark ? 'bg-white/5 hover:bg-white/10 text-white' : 'bg-black/5 hover:bg-black/10 text-black'}`}><Orbit size={22} className="text-emerald-400"/> Flux.2 Image Gen</button>
-                    <button onClick={() => { handleAI('3d'); setShowAiMenu(false); }} className={`w-full text-left text-base font-bold px-6 py-5 rounded-[28px] flex items-center gap-5 transition-all mt-3 hover:scale-105 ${isDark ? 'bg-white/5 hover:bg-white/10 text-white' : 'bg-black/5 hover:bg-black/10 text-black'}`}><Shapes size={22} className="text-purple-400"/> Trellis 3D Object</button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* 🎬 CINEMATIC AI RESULT BENTO BOX */}
-        {generatedAsset && (
-          <div className="fixed inset-0 z-[300] flex items-center justify-center p-12 bg-black/40 backdrop-blur-2xl animate-in fade-in duration-700">
-            <div className={`w-full max-w-2xl backdrop-blur-[60px] border shadow-[0_100px_200px_-40px_rgba(0,0,0,0.8)] rounded-[64px] p-12 flex flex-col relative animate-in zoom-in-95 slide-in-from-bottom-24 duration-700 ${isDark ? 'bg-[#1a1a1a]/90 border-white/10' : 'bg-white/90 border-white'}`}>
-              <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/20 via-purple-500/20 to-pink-500/20 rounded-[64px] pointer-events-none blur-3xl"></div>
-              
-              <div className="flex justify-between items-center mb-10 relative z-10">
-                <h3 className={`font-black text-4xl flex items-center gap-5 tracking-tight ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                  <div className="w-16 h-16 flex items-center justify-center bg-gradient-to-br from-indigo-500 to-purple-600 rounded-[28px] text-white shadow-2xl shadow-purple-500/40"><Sparkles size={28} /></div>
-                  Synthesis Complete
+          {/* 📂 SPLIT MODE BENTO SIDEBAR */}
+          {splitMode && !focusMode && (
+            <div className={`w-[480px] border-l backdrop-blur-3xl p-10 overflow-y-auto z-30 shadow-[-40px_0_80px_-20px_rgba(0,0,0,0.2)] flex flex-col gap-8 animate-in slide-in-from-right-12 duration-500 ${isDark ? 'bg-black/40 border-white/5' : 'bg-white/60 border-black/5'}`}>  
+              <div className={`backdrop-blur-2xl rounded-[48px] p-10 shadow-2xl border ${isDark ? 'bg-white/5 border-white/10' : 'bg-white/80 border-white'}`}>  
+                <h3 className={`text-2xl font-black mb-8 flex items-center gap-4 ${isDark ? 'text-white' : 'text-gray-900'}`}>  
+                  <div className="p-3 bg-indigo-500/20 rounded-2xl text-indigo-400"><Layers size={28} /></div>
+                  Document Cortex
                 </h3>
-                <button onClick={() => setGeneratedAsset(null)} className={`p-5 rounded-[28px] transition-all hover:scale-110 ${isDark ? 'bg-white/5 hover:bg-white/10 text-white' : 'bg-black/5 hover:bg-black/10 text-black'}`}><X size={28} /></button>
+                <DocumentWorkspace note={note} compact />  
               </div>
-              
-              <div className={`w-full h-[460px] rounded-[48px] flex items-center justify-center overflow-hidden mb-10 border shadow-inner relative z-10 group p-4 ${isDark ? 'bg-black/40 border-white/5' : 'bg-gray-100/50 border-black/5'}`}>
-                {generatedAsset.assetUrl.startsWith('data:image') || generatedAsset.assetUrl.match(/\.(jpeg|jpg|gif|png)$/i) ? (
-                  <img src={generatedAsset.assetUrl} alt="Preview" className="object-contain w-full h-full rounded-[40px] drop-shadow-2xl group-hover:scale-[1.05] transition-transform duration-[3s] ease-out" />
-                ) : (
-                  <div className="text-center flex flex-col items-center">
-                    <div className="w-32 h-32 bg-gradient-to-br from-blue-500 to-indigo-600 text-white rounded-[40px] flex items-center justify-center mb-8 shadow-2xl shadow-blue-600/40 animate-bounce"><Shapes size={64}/></div>
-                    <p className={`text-4xl font-black mb-4 ${isDark ? 'text-white' : 'text-gray-900'}`}>3D Asset Ready</p>
-                    <p className={`text-lg font-semibold ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Ready for spatial embedding.</p>
+            </div>
+          )}  
+
+          {/* 🛸 MAC-OS STYLE FLOATING GLASS DOCK */}
+          <div className={`fixed bottom-12 left-1/2 -translate-x-1/2 z-[100] transition-transform duration-1000 ease-[cubic-bezier(0.23,1,0.32,1)] ${focusMode ? 'translate-y-64' : 'translate-y-0'}`}>  
+            <div className={`backdrop-blur-[60px] border shadow-[0_40px_100px_-20px_rgba(0,0,0,0.5)] px-5 py-5 rounded-[48px] flex items-center gap-2 animate-in slide-in-from-bottom-24 duration-1000 ${isDark ? 'bg-[#1a1a1a]/80 border-white/10 text-white' : 'bg-white/80 border-black/5 text-gray-900'}`}>  
+              <ToolbarBtn onClick={() => editor?.chain().focus().undo().run()} isDark={isDark}><Undo2 size={24} /></ToolbarBtn>
+              <div className={`w-px h-12 mx-3 ${isDark ? 'bg-white/10' : 'bg-black/10'}`} />
+              <ToolbarBtn onClick={() => editor?.chain().focus().toggleBold().run()} active={editor?.isActive('bold')} isDark={isDark}><Bold size={24} /></ToolbarBtn>
+              <ToolbarBtn onClick={() => editor?.chain().focus().toggleItalic().run()} active={editor?.isActive('italic')} isDark={isDark}><Italic size={24} /></ToolbarBtn>
+              <ToolbarBtn onClick={() => editor?.chain().focus().toggleUnderline().run()} active={editor?.isActive('underline')} isDark={isDark}><UnderlineIcon size={24} /></ToolbarBtn>
+              <div className={`w-px h-12 mx-3 ${isDark ? 'bg-white/10' : 'bg-black/10'}`} />  
+              {/* Color Pickers */}
+              <div className={`relative group p-4 flex items-center justify-center rounded-3xl transition-all cursor-pointer border hover:scale-110 ${isDark ? 'hover:bg-white/10 border-transparent text-gray-300' : 'hover:bg-black/5 border-transparent text-gray-600'}`}>  
+                <Type size={24} />
+                <input type="color" className="absolute inset-0 opacity-0 w-full h-full cursor-pointer" onChange={(e) => editor?.chain().focus().setColor(e.target.value).run()} />
+              </div>
+              <div className={`relative group p-4 flex items-center justify-center rounded-3xl transition-all cursor-pointer border hover:scale-110 ${isDark ? 'hover:bg-white/10 border-transparent text-gray-300' : 'hover:bg-black/5 border-transparent text-gray-600'}`}>  
+                <Highlighter size={24} />
+                <input type="color" defaultValue="#fef08a" className="absolute inset-0 opacity-0 w-full h-full cursor-pointer" onChange={(e) => editor?.chain().focus().toggleHighlight({ color: e.target.value }).run()} />
+              </div>  
+              <div className={`w-px h-12 mx-3 ${isDark ? 'bg-white/10' : 'bg-black/10'}`} />
+              <ToolbarBtn onClick={() => editor?.chain().focus().toggleHeading({ level: 1 }).run()} active={editor?.isActive('heading', { level: 1 })} isDark={isDark}><Heading1 size={24} /></ToolbarBtn>
+              <ToolbarBtn onClick={() => editor?.chain().focus().toggleHeading({ level: 2 }).run()} active={editor?.isActive('heading', { level: 2 })} isDark={isDark}><Heading2 size={24} /></ToolbarBtn>
+              <ToolbarBtn onClick={() => editor?.chain().focus().toggleBulletList().run()} active={editor?.isActive('bulletList')} isDark={isDark}><List size={24} /></ToolbarBtn>
+              <div className={`w-px h-12 mx-3 ${isDark ? 'bg-white/10' : 'bg-black/10'}`} />
+              <ToolbarBtn onClick={addImage} isDark={isDark}><ImageIcon size={24} className="text-emerald-500" /></ToolbarBtn>  
+              {/* The Neural AI Button */}
+              <div className="relative ml-5">  
+                <button onClick={() => setShowAiMenu(!showAiMenu)} className={`flex items-center justify-center p-5 rounded-[32px] shadow-2xl transition-all duration-700 ease-[cubic-bezier(0.23,1,0.32,1)] ${showAiMenu ? 'bg-indigo-600 text-white scale-110 shadow-indigo-500/50' : 'bg-gradient-to-br from-indigo-500 to-purple-600 text-white hover:scale-110 hover:shadow-purple-500/40 hover:-translate-y-2'}`}>  
+                  <Wand2 size={28} className={aiState === 'generating' ? 'animate-spin' : 'animate-pulse'} />
+                </button>  
+                {showAiMenu && (
+                  <div className={`absolute bottom-[calc(100%+40px)] left-1/2 -translate-x-1/2 w-[380px] backdrop-blur-[60px] border shadow-[0_50px_100px_-20px_rgba(0,0,0,0.5)] rounded-[48px] p-6 z-50 animate-in zoom-in-95 slide-in-from-bottom-8 duration-500 ${isDark ? 'bg-[#1a1a1a]/90 border-white/10' : 'bg-white/90 border-black/5'}`}>  
+                    <div className="p-2">  
+                      <p className="text-[12px] text-gray-500 font-black tracking-[0.25em] uppercase mb-5 px-3">Neural Operations</p>
+                      <button onClick={() => { handleAI('summarize'); setShowAiMenu(false); }} className={`w-full text-left text-base font-bold px-6 py-5 rounded-[28px] flex items-center gap-5 transition-all hover:scale-105 ${isDark ? 'bg-white/5 hover:bg-white/10 text-white' : 'bg-black/5 hover:bg-black/10 text-black'}`}><AlignLeft size={22} className="text-blue-400"/> Executive Synthesis</button>
+                      <button onClick={() => { handleAI('flashcards'); setShowAiMenu(false); }} className={`w-full text-left text-base font-bold px-6 py-5 rounded-[28px] flex items-center gap-5 transition-all mt-3 hover:scale-105 ${isDark ? 'bg-white/5 hover:bg-white/10 text-white' : 'bg-black/5 hover:bg-black/10 text-black'}`}><Brain size={22} className="text-pink-400"/> Extract Flashcards</button>
+                      <div className={`h-px my-6 mx-5 ${isDark ? 'bg-white/10' : 'bg-black/10'}`} />
+                      <p className="text-[12px] text-gray-500 font-black tracking-[0.25em] uppercase mb-5 px-3">Visual Synthesis</p>
+                      <button onClick={() => { handleAI('diagram'); setShowAiMenu(false); }} className={`w-full text-left text-base font-bold px-6 py-5 rounded-[28px] flex items-center gap-5 transition-all hover:scale-105 ${isDark ? 'bg-white/5 hover:bg-white/10 text-white' : 'bg-black/5 hover:bg-black/10 text-black'}`}><Orbit size={22} className="text-emerald-400"/> Flux.2 Image Gen</button>
+                      <button onClick={() => { handleAI('3d'); setShowAiMenu(false); }} className={`w-full text-left text-base font-bold px-6 py-5 rounded-[28px] flex items-center gap-5 transition-all mt-3 hover:scale-105 ${isDark ? 'bg-white/5 hover:bg-white/10 text-white' : 'bg-black/5 hover:bg-black/10 text-black'}`}><Shapes size={22} className="text-purple-400"/> Trellis 3D Object</button>
+                    </div>
                   </div>
                 )}
               </div>
-
-              <div className="flex gap-6 relative z-10">
-                <button onClick={() => setGeneratedAsset(null)} className={`flex-1 py-6 rounded-[32px] text-xl font-bold transition-all hover:scale-105 ${isDark ? 'bg-white/5 hover:bg-white/10 text-white' : 'bg-black/5 hover:bg-black/10 text-black'}`}>Discard</button>
-                <button onClick={insertGeneratedAsset} className="flex-[2] py-6 rounded-[32px] text-xl font-black bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 hover:from-indigo-600 hover:via-purple-600 hover:to-pink-600 text-white shadow-2xl shadow-purple-500/30 hover:shadow-purple-500/50 hover:-translate-y-1 transition-all duration-300">Embed into Canvas</button>
-              </div>
             </div>
           </div>
-        )}
+
+          {/* 🎬 CINEMATIC AI RESULT BENTO BOX */}
+          {generatedAsset && (
+            <div className="fixed inset-0 z-[300] flex items-center justify-center p-12 bg-black/40 backdrop-blur-2xl animate-in fade-in duration-700">  
+              <div className={`w-full max-w-2xl backdrop-blur-[60px] border shadow-[0_100px_200px_-40px_rgba(0,0,0,0.8)] rounded-[64px] p-12 flex flex-col relative animate-in zoom-in-95 slide-in-from-bottom-24 duration-700 ${isDark ? 'bg-[#1a1a1a]/90 border-white/10' : 'bg-white/90 border-white'}`}>  
+                <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/20 via-purple-500/20 to-pink-500/20 rounded-[64px] pointer-events-none blur-3xl"></div>  
+                <div className="flex justify-between items-center mb-10 relative z-10">  
+                  <h3 className={`font-black text-4xl flex items-center gap-5 tracking-tight ${isDark ? 'text-white' : 'text-gray-900'}`}>  
+                    <div className="w-16 h-16 flex items-center justify-center bg-gradient-to-br from-indigo-500 to-purple-600 rounded-[28px] text-white shadow-2xl shadow-purple-500/40"><Sparkles size={28} /></div>
+                    Synthesis Complete
+                  </h3>
+                  <button onClick={() => setGeneratedAsset(null)} className={`p-5 rounded-[28px] transition-all hover:scale-110 ${isDark ? 'bg-white/5 hover:bg-white/10 text-white' : 'bg-black/5 hover:bg-black/10 text-black'}`}><X size={28} /></button>
+                </div>  
+                <div className={`w-full h-[460px] rounded-[48px] flex items-center justify-center overflow-hidden mb-10 border shadow-inner relative z-10 group p-4 ${isDark ? 'bg-black/40 border-white/5' : 'bg-gray-100/50 border-black/5'}`}>  
+                  {generatedAsset.assetUrl.startsWith('data:image') || generatedAsset.assetUrl.match(/\.(jpeg|jpg|gif|png)$/i) ? (
+                    <img src={generatedAsset.assetUrl} alt="Preview" className="object-contain w-full h-full rounded-[40px] drop-shadow-2xl group-hover:scale-[1.05] transition-transform duration-[3s] ease-out" />
+                  ) : (
+                    <div className="text-center flex flex-col items-center">  
+                      <div className="w-32 h-32 bg-gradient-to-br from-blue-500 to-indigo-600 text-white rounded-[40px] flex items-center justify-center mb-8 shadow-2xl shadow-blue-600/40 animate-bounce"><Shapes size={64}/></div>
+                      <p className={`text-4xl font-black mb-4 ${isDark ? 'text-white' : 'text-gray-900'}`}>3D Asset Ready</p>
+                      <p className={`text-lg font-semibold ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Ready for spatial embedding.</p>
+                    </div>
+                  )}  
+                </div>  
+                <div className="flex gap-6 relative z-10">  
+                  <button onClick={() => setGeneratedAsset(null)} className={`flex-1 py-6 rounded-[32px] text-xl font-bold transition-all hover:scale-105 ${isDark ? 'bg-white/5 hover:bg-white/10 text-white' : 'bg-black/5 hover:bg-black/10 text-black'}`}>Discard</button>
+                  <button onClick={insertGeneratedAsset} className="flex-[2] py-6 rounded-[32px] text-xl font-black bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 hover:from-indigo-600 hover:via-purple-600 hover:to-pink-600 text-white shadow-2xl shadow-purple-500/30 hover:shadow-purple-500/50 hover:-translate-y-1 transition-all duration-300">Embed into Canvas</button>
+                </div>
+              </div>
+            </div>
+          )}  
+        </div>  
       </div>
-    </div>
-  );
+    );
 }
 
 function ToolbarBtn({ onClick, active, children, isDark }: { onClick?: () => void; active?: boolean; children: React.ReactNode; isDark: boolean; }) {
   return (
-    <button onClick={onClick} className={`p-4 rounded-3xl transition-all duration-500 ease-out flex items-center justify-center hover:scale-110 ${active ? (isDark ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/40 border border-transparent' : 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/40 border border-transparent') : (isDark ? 'hover:bg-white/10 text-gray-300 border border-transparent' : 'hover:bg-black/5 text-gray-600 border border-transparent')}`}>
+    <button onClick={onClick} className={`p-4 rounded-3xl transition-all duration-500 ease-out flex items-center justify-center hover:scale-110 ${active ? (isDark ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/40 border border-transparent' : 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/40 border border-transparent') : (isDark ? 'hover:bg-white/10 text-gray-300 border border-transparent' : 'hover:bg-black/5 text-gray-600 border border-transparent')}`}>  
       {children}
     </button>
   );
