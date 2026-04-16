@@ -201,39 +201,43 @@ export function NoteEditor() {
         } | null;
       };
 
-        if (action === 'summarize') {
-          const points = (data.summaryPoints ?? []).filter(Boolean).slice(0, AI_SUMMARY_POINT_LIMIT);
-          if (points.length === 0) {
-            applyLocalFallback(action);
-            setAiState('fallback');
-            toast.success('Summary added (local fallback)');
-          } else {
-            const summaryHtml = `<h3>📝 AI Summary</h3><ul>${points.map((point) => `<li>${escapeHtml(point)}</li>`).join('')}</ul>`;
-            updateNote(note.id, { content: `${note.content}<hr>${summaryHtml}` });
-            setAiState('success');
-            toast.success('NVIDIA NIM summary added!');
-          }
-        } else if (action === 'flashcards' || action === 'quiz') {
+      if (action === 'summarize') {
+        const points = (data.summaryPoints ?? []).filter(Boolean).slice(0, AI_SUMMARY_POINT_LIMIT);
+        if (points.length === 0) {
+          applyLocalFallback(action);
+          setAiState('fallback');
+          toast.success('Summary added (local fallback)');
+        } else {
+          const summaryHtml = `<h3>📝 AI Summary</h3><ul>${points.map((point) => `<li>${escapeHtml(point)}</li>`).join('')}</ul>`;
+          updateNote(note.id, { content: `${note.content}<hr>${summaryHtml}` });
+          setAiState('success');
+          toast.success('NVIDIA NIM summary added!');
+        }
+      } else if (action === 'flashcards' || action === 'quiz') {
         const cards = (data.flashcards ?? [])
           .filter((c) => c.front && c.back)
           .slice(0, action === 'quiz' ? AI_QUIZ_CARD_LIMIT : AI_FLASHCARD_CARD_LIMIT);
-          if (cards.length === 0) {
-            applyLocalFallback(action);
-            setAiState('fallback');
-            toast.success(`${action === 'quiz' ? 'Quiz' : 'Flashcards'} generated (local fallback)`);
-          } else {
-            cards.forEach((card) => addFlashcard(card.front, card.back, note.id, note.tags));
-            const expected = action === 'quiz' ? AI_QUIZ_CARD_LIMIT : AI_FLASHCARD_CARD_LIMIT;
-            setAiState(cards.length < expected ? 'partial-success' : 'success');
-            toast.success(`NVIDIA NIM ${action === 'quiz' ? 'quiz cards' : 'flashcards'} generated!`);
-          }
+          
+        if (cards.length === 0) {
+          applyLocalFallback(action);
+          setAiState('fallback');
+          toast.success(`${action === 'quiz' ? 'Quiz' : 'Flashcards'} generated (local fallback)`);
         } else {
+          cards.forEach((card) => addFlashcard(card.front, card.back, note.id, note.tags));
+          
+          // Adjusted: Call it a full success as long as it generated cards (even if parallel fetched missed a few)
+          setAiState('success');
+          toast.success(`NVIDIA NIM ${action === 'quiz' ? 'quiz cards' : 'flashcards'} generated (${cards.length})!`);
+        }
+      } else {
         const safePreview = toSafeUrl(data.generated?.previewImage);
         const safeAsset = toSafeUrl(data.generated?.assetUrl);
-          if (!safePreview && !safeAsset) {
-            setAiState('fallback');
-            toast.error('Generation completed but no preview URL was returned.');
-          } else {
+        
+        // Adjusted: Checking if AT LEAST ONE generated format was successfully returned.
+        if (!safePreview && !safeAsset) {
+          setAiState('fallback');
+          toast.error('Generation completed but no preview URL was returned.');
+        } else {
           const titleByAction: Record<'diagram' | 'image-convert' | '3d', string> = {
             diagram: '🖼️ AI Diagram/Photo Generation',
             'image-convert': '🎨 AI Image Conversion',
@@ -246,12 +250,13 @@ export function NoteEditor() {
             `<p><strong>Prompt:</strong> ${escapeHtml(prompt)}</p>`,
             safePreview ? `<p><img src="${escapeHtml(safePreview)}" alt="Generated output" /></p>` : '',
             safeAsset ? `<p><a href="${escapeHtml(safeAsset)}" target="_blank" rel="noreferrer">Open generated asset</a></p>` : '',
-            ].join('');
-            updateNote(note.id, { content: `${note.content}<hr>${resultHtml}` });
-            setAiState(safePreview && safeAsset ? 'success' : 'partial-success');
-            toast.success(action === '3d' ? 'Trellis 3D generation added to note!' : 'FLUX generation result added to note!');
-          }
+          ].join('');
+          
+          updateNote(note.id, { content: `${note.content}<hr>${resultHtml}` });
+          setAiState('success');
+          toast.success(action === '3d' ? 'Trellis 3D generation added to note!' : 'FLUX generation result added to note!');
         }
+      }
     } catch {
       if (action === 'summarize' || action === 'flashcards' || action === 'quiz') {
         applyLocalFallback(action);
