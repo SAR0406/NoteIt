@@ -2,7 +2,6 @@ import {
   AI_CONTEXT_CHAR_LIMIT,
   AI_FLASHCARD_BACK_CHAR_LIMIT,
   AI_FLASHCARD_FRONT_CHAR_LIMIT,
-  AI_SUMMARY_POINT_LIMIT,
 } from './constants';
 import { sanitizeModelText } from './text';
 
@@ -58,15 +57,23 @@ const extractJsonObject = (value: string) => {
   return value.slice(start, end + 1);
 };
 
+type ChatCompletion = { choices?: Array<{ message?: { content?: string } }> };
+
 // Robust extractor for NVIDIA GenAI responses
-const extractGeneratedAssets = (raw: any) => {
-  // Extract URLs (Trellis or other hosted assets)
-  const assetUrl = raw?.asset_url || raw?.url || raw?.artifacts?.[0]?.url || raw?.artifacts?.[0]?.asset_url;
-  
-  // Extract Base64 Images (Flux)
-  const rawB64 = raw?.image || raw?.b64_json || raw?.artifacts?.[0]?.base64;
-  let previewImage = assetUrl; // Default to URL if no base64
-  
+const extractGeneratedAssets = (raw: unknown) => {
+  const record = (raw && typeof raw === 'object') ? (raw as Record<string, unknown>) : {};
+  const artifacts = Array.isArray(record.artifacts) ? record.artifacts : [];
+  const firstArtifact = (artifacts[0] && typeof artifacts[0] === 'object')
+    ? (artifacts[0] as Record<string, unknown>)
+    : {};
+
+  const assetUrl = [record.asset_url, record.url, firstArtifact.url, firstArtifact.asset_url]
+    .find((val): val is string => typeof val === 'string');
+
+  const rawB64 = [record.image, record.b64_json, firstArtifact.base64]
+    .find((val): val is string => typeof val === 'string');
+
+  let previewImage = assetUrl;
   if (rawB64) {
     previewImage = rawB64.startsWith('data:') ? rawB64 : `data:image/jpeg;base64,${rawB64}`;
   }
@@ -120,7 +127,7 @@ const callGenerationModel = async (payload: NIMRequestPayload, apiKey: string): 
     throw new Error(`Generation API failed with status ${response.status}: ${errBody}`);
   }
   
-  const raw = await response.json();
+  const raw = (await response.json()) as unknown;
   const assets = extractGeneratedAssets(raw);
 
   return {
@@ -168,8 +175,7 @@ export async function generateWithNIM(payload: NIMRequestPayload): Promise<NIMRe
         max_tokens: 1024,
       }),
     });
-    
-    const data: any = await response.json();
+    const data = (await response.json()) as ChatCompletion;
     const content = data.choices?.[0]?.message?.content || '{}';
     const parsed = extractJsonObject(content);
     return parsed ? JSON.parse(parsed) : { summaryPoints: [] };
@@ -199,10 +205,12 @@ export async function generateWithNIM(payload: NIMRequestPayload): Promise<NIMRe
         temperature: 0.7, 
         max_tokens: 500,
       }),
-    }).then(res => res.json()).catch(err => {
-      console.warn("Parallel request failed:", err);
-      return null;
-    });
+    })
+      .then((res) => res.json() as Promise<ChatCompletion>)
+      .catch((err) => {
+        console.warn('Parallel request failed:', err);
+        return null;
+      });
   });
 
   const results = await Promise.all(parallelRequests);
