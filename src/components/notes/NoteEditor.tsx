@@ -456,7 +456,7 @@ export function NoteEditor() {
 
             <div className="flex gap-2 mt-auto">
               <button onClick={() => setGeneratedAsset(null)} className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors">Discard</button>
-              <button onClick={insertGeneratedAsset} className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-purple-600 hover:bg-purple-700 text-white transition-colors shadow-sm shadow-purple-200 flex items-center justify-center gap-1"><Image size={14} /> Insert to Note</button>
+              <button onClick={insertGeneratedAsset} className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-purple-600 hover:bg-purple-700 text-white transition-colors shadow-sm shadow-purple-200 flex items-center justify-center gap-1"><ImageIcon size={14} /> Insert to Note</button>
             </div>
           </div>
         )}
