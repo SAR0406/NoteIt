@@ -28,6 +28,7 @@ export function NotesList() {
     notesFilter,
     setNotesSort,
     setNotesFilter,
+    setActiveTag,
   } = useStore();
 
   const allTags = Array.from(new Set(notes.filter((n) => !n.isTrashed).flatMap((n) => n.tags))).sort();
@@ -150,7 +151,7 @@ export function NotesList() {
           />
           <select
             className="text-xs rounded-lg border border-[var(--border)] bg-white px-2 py-1 text-[var(--text-secondary)]"
-            onChange={(e) => useStore.getState().setActiveTag(e.target.value || null)}
+            onChange={(e) => setActiveTag(e.target.value || null)}
             value={activeTag ?? ''}
             title="Filter by tag"
           >

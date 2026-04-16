@@ -41,7 +41,7 @@ export function CommandPalette() {
     .filter((n) => !n.isTrashed)
     .filter((n) => !q || n.title.toLowerCase().includes(q) || n.content.replace(/<[^>]+>/g, ' ').toLowerCase().includes(q))
     .slice(0, 8);
-  const tags = Array.from(new Set(notes.flatMap((n) => n.tags))).filter((t) => !q || t.toLowerCase().includes(q)).slice(0, 6);
+  const tags = Array.from(new Set(notes.filter((n) => !n.isTrashed).flatMap((n) => n.tags))).filter((t) => !q || t.toLowerCase().includes(q)).slice(0, 6);
 
   const runSearch = () => {
     setSearchQuery(query);
@@ -52,8 +52,14 @@ export function CommandPalette() {
 
   return (
     <div className="fixed inset-0 z-[90] bg-slate-950/45 backdrop-blur-[1px] flex items-start justify-center p-4 md:p-10">
-      <div className="w-full max-w-2xl surface-card rounded-2xl overflow-hidden">
+      <div
+        className="w-full max-w-2xl surface-card rounded-2xl overflow-hidden"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="command-palette-title"
+      >
         <div className="flex items-center gap-2 px-4 py-3 border-b border-[var(--border)]">
+          <span id="command-palette-title" className="sr-only">Command palette</span>
           <Command size={16} className="text-[var(--text-muted)]" />
           <input
             autoFocus

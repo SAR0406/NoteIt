@@ -381,7 +381,9 @@ export const useStore = create<AppState & Actions>()(
               return nb;
             }),
             notes: s.notes.map((note) =>
-              note.subjectId === id ? { ...note, notebookId: targetNotebookId, updatedAt: new Date().toISOString() } : note
+              (note.subjectId === subject.id || (note.topicId ? subject.topicIds.includes(note.topicId) : false))
+                ? { ...note, notebookId: targetNotebookId, updatedAt: new Date().toISOString() }
+                : note
             ),
           };
         }),

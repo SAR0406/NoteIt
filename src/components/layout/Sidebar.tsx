@@ -99,22 +99,34 @@ export function Sidebar() {
   const renameTarget = () => {
     if (!menuTarget) return;
     if (menuTarget.type === 'notebook') {
-      const current = notebooks.find((n) => n.id === menuTarget.id);
-      const value = window.prompt('Rename notebook', current?.name ?? '');
-      if (value?.trim()) updateNotebook(menuTarget.id, { name: value.trim() });
+      renameNotebook(menuTarget.id);
     }
     if (menuTarget.type === 'subject') {
-      const current = subjects.find((s) => s.id === menuTarget.id);
-      const value = window.prompt('Rename subject', current?.name ?? '');
-      if (value?.trim()) updateSubject(menuTarget.id, { name: value.trim() });
+      renameSubject(menuTarget.id);
     }
     if (menuTarget.type === 'topic') {
-      const current = topics.find((t) => t.id === menuTarget.id);
-      const value = window.prompt('Rename topic', current?.name ?? '');
-      if (value?.trim()) updateTopic(menuTarget.id, { name: value.trim() });
+      renameTopic(menuTarget.id);
     }
     setMenuTarget(null);
     setMenuPos(null);
+  };
+
+  const renameNotebook = (id: string) => {
+    const current = notebooks.find((n) => n.id === id);
+    const value = window.prompt('Rename notebook', current?.name ?? '');
+    if (value?.trim()) updateNotebook(id, { name: value.trim() });
+  };
+
+  const renameSubject = (id: string) => {
+    const current = subjects.find((s) => s.id === id);
+    const value = window.prompt('Rename subject', current?.name ?? '');
+    if (value?.trim()) updateSubject(id, { name: value.trim() });
+  };
+
+  const renameTopic = (id: string) => {
+    const current = topics.find((t) => t.id === id);
+    const value = window.prompt('Rename topic', current?.name ?? '');
+    if (value?.trim()) updateTopic(id, { name: value.trim() });
   };
 
   const moveTarget = () => {
@@ -253,7 +265,7 @@ export function Sidebar() {
                   <span className="text-base leading-none">{nb.icon}</span>
                   <span className="flex-1 text-sm truncate">{nb.name}</span>
                   <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: nb.color }} />
-                  <button className="opacity-0 group-hover:opacity-100 text-indigo-200/60 hover:text-indigo-300 flex-shrink-0" onClick={(e) => { e.stopPropagation(); const next = window.prompt('Rename notebook', nb.name); if (next?.trim()) updateNotebook(nb.id, { name: next.trim() }); }} title="Rename notebook"><Pencil size={12} /></button>
+                  <button className="opacity-0 group-hover:opacity-100 text-indigo-200/60 hover:text-indigo-300 flex-shrink-0" onClick={(e) => { e.stopPropagation(); renameNotebook(nb.id); }} title="Rename notebook"><Pencil size={12} /></button>
                   <button className="opacity-0 group-hover:opacity-100 text-indigo-200/50 hover:text-red-300 flex-shrink-0" onClick={(e) => { e.stopPropagation(); deleteNotebook(nb.id); }} title="Delete notebook"><Trash2 size={12} /></button>
                 </div>
 
@@ -276,7 +288,7 @@ export function Sidebar() {
                             <span className="flex-1 text-xs truncate">{sub.name}</span>
                             <div className="flex gap-1 opacity-0 group-hover:opacity-100">
                               <button className="text-indigo-200/60 hover:text-indigo-300" onClick={(e) => { e.stopPropagation(); setAddingTopicFor(sub.id); }} title="Add topic"><Plus size={11} /></button>
-                              <button className="text-indigo-200/60 hover:text-indigo-300" onClick={(e) => { e.stopPropagation(); const next = window.prompt('Rename subject', sub.name); if (next?.trim()) updateSubject(sub.id, { name: next.trim() }); }} title="Rename subject"><Pencil size={11} /></button>
+                              <button className="text-indigo-200/60 hover:text-indigo-300" onClick={(e) => { e.stopPropagation(); renameSubject(sub.id); }} title="Rename subject"><Pencil size={11} /></button>
                               <button className="text-indigo-200/60 hover:text-red-300" onClick={(e) => { e.stopPropagation(); deleteSubject(sub.id); }} title="Delete subject"><Trash2 size={11} /></button>
                             </div>
                           </div>
@@ -317,7 +329,7 @@ export function Sidebar() {
                                   <FileText size={11} className="text-indigo-200/40 flex-shrink-0" />
                                   <span className="flex-1 text-xs truncate text-indigo-100/90">{topic.name}</span>
                                   <span className="text-xs text-indigo-200/40 group-hover:hidden">{topic.noteIds.length}</span>
-                                  <button className="opacity-0 group-hover:opacity-100 text-indigo-200/60 hover:text-indigo-300" onClick={(e) => { e.stopPropagation(); const next = window.prompt('Rename topic', topic.name); if (next?.trim()) updateTopic(topic.id, { name: next.trim() }); }}><Pencil size={10} /></button>
+                                  <button className="opacity-0 group-hover:opacity-100 text-indigo-200/60 hover:text-indigo-300" onClick={(e) => { e.stopPropagation(); renameTopic(topic.id); }}><Pencil size={10} /></button>
                                   <button className="opacity-0 group-hover:opacity-100 text-indigo-200/50 hover:text-red-300" onClick={(e) => { e.stopPropagation(); deleteTopic(topic.id); }}><Trash2 size={10} /></button>
                                 </div>
                               ))}
