@@ -1,9 +1,10 @@
 'use client';
 
 import { useStore } from '@/store/useStore';
+import { useShallow } from 'zustand/react/shallow';
 
 export function useNotesSlice() {
-  return useStore((s) => ({
+  return useStore(useShallow((s) => ({
     notes: s.notes,
     selectedNoteId: s.selectedNoteId,
     searchQuery: s.searchQuery,
@@ -22,5 +23,5 @@ export function useNotesSlice() {
     restoreNote: s.restoreNote,
     toggleFavorite: s.toggleFavorite,
     togglePin: s.togglePin,
-  }));
+  })));
 }
