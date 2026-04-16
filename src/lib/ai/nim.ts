@@ -1,16 +1,145 @@
+import {
+  AI_CONTEXT_CHAR_LIMIT,
+  AI_FLASHCARD_BACK_CHAR_LIMIT,
+  AI_FLASHCARD_FRONT_CHAR_LIMIT,
+  AI_SUMMARY_POINT_LIMIT,
+} from './constants';
+import { sanitizeModelText } from './text';
+
+const NVIDIA_NIM_BASE_URL = process.env.NVIDIA_NIM_BASE_URL || 'https://integrate.api.nvidia.com/v1';
+const NVIDIA_NIM_MODEL = process.env.NVIDIA_NIM_MODEL || 'minimaxai/minimax-m2.7'; // Using minimax as default based on provided code
+
+type AIAction = 'summarize' | 'flashcards' | 'quiz' | 'diagram' | 'image-convert' | '3d';
+type GenerationModel = 'black-forest-labs/flux.2-klein-4b' | 'microsoft/trellis';
+const GENERATION_ACTIONS = ['diagram', 'image-convert', '3d'] as const;
+const GENERATION_ACTION_SET = new Set<AIAction>(GENERATION_ACTIONS);
+
+export interface NIMRequestPayload {
+  action: AIAction;
+  title: string;
+  htmlContent: string;
+  tags: string[];
+  handwritingIndex: string;
+  attachmentIndex: string[];
+  drawingIndex: string[];
+  prompt?: string;
+  image?: string;
+  model?: GenerationModel;
+}
+
+interface NIMResult {
+  summaryPoints?: string[];
+  flashcards?: Array<{ front: string; back: string }>;
+  generated?: {
+    action: AIAction;
+    model: GenerationModel;
+    raw: unknown;
+    previewImage?: string;
+    assetUrl?: string;
+  };
+}
+
+const stripHtml = (value: string) => {
+  return value.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+};
+
+const clip = (value: string, max = AI_CONTEXT_CHAR_LIMIT) => {
+  if (value.length <= max) return value;
+  const sliced = value.slice(0, max);
+  const lastSpace = sliced.lastIndexOf(' ');
+  if (lastSpace > max - 120) return sliced.slice(0, lastSpace);
+  return sliced;
+};
+
+const extractJsonObject = (value: string) => {
+  const start = value.indexOf('{');
+  const end = value.lastIndexOf('}');
+  if (start < 0 || end <= start) return null;
+  return value.slice(start, end + 1);
+};
+
+// --- IMAGE & 3D GENERATION LOGIC ---
+const callGenerationModel = async (
+  payload: NIMRequestPayload,
+  apiKey: string
+): Promise<NIMResult['generated']> => {
+  const prompt = payload.prompt?.trim();
+  if (!prompt) throw new Error('Prompt is required for generation');
+
+  let invokeUrl = '';
+  let body: Record<string, unknown> = {};
+  let model: GenerationModel;
+
+  if (payload.action === '3d') {
+    // 3D Model Generation via Trellis
+    model = 'microsoft/trellis';
+    invokeUrl = `https://ai.api.nvidia.com/v1/genai/${model}`;
+    body = {
+      prompt,
+      slat_cfg_scale: 3,
+      ss_cfg_scale: 7.5,
+      slat_sampling_steps: 25,
+      ss_sampling_steps: 25,
+      seed: 0
+    };
+  } else {
+    // Image Generation via Flux
+    model = 'black-forest-labs/flux.2-klein-4b';
+    invokeUrl = `https://ai.api.nvidia.com/v1/genai/${model}`;
+    body = {
+      prompt: payload.action === 'image-convert' 
+        ? `Clean study-style editing of: ${prompt}` 
+        : prompt,
+      width: 1024,
+      height: 1024,
+      seed: 0,
+      steps: 4
+    };
+  }
+
+  const response = await fetch(invokeUrl, {
+    method: 'POST',
+    body: JSON.stringify(body),
+    headers: { 
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+      'Accept': 'application/json',
+    }
+  });
+
+  if (response.status !== 200) {
+    const errBody = await response.text();
+    throw new Error(`Invocation failed with status ${response.status} ${errBody}`);
+  }
+  
+  const raw: any = await response.json();
+  
+  // Extract URLs safely (fallback logic depending on specific NVIDIA JSON structure)
+  const assetUrl = raw?.asset_url || raw?.artifacts?.[0]?.url || raw?.artifacts?.[0]?.asset_url;
+  const previewImage = raw?.image ? `data:image/jpeg;base64,${raw.image}` : undefined;
+
+  return {
+    action: payload.action,
+    model,
+    raw,
+    previewImage: previewImage || assetUrl, // Fallback to asset if preview base64 isn't returned
+    assetUrl: assetUrl || previewImage
+  };
+};
+
 export async function generateWithNIM(payload: NIMRequestPayload): Promise<NIMResult> {
   const apiKey = process.env.NVIDIA_API_KEY;
   if (!apiKey) {
     throw new Error('NVIDIA_API_KEY is not configured');
   }
 
-  // 1. Handle Generation Models (Flux Image / Trellis 3D)
+  // 1. Generation Models (Image / 3D)
   if (GENERATION_ACTION_SET.has(payload.action)) {
     const generated = await callGenerationModel(payload, apiKey);
     return { generated };
   }
 
-  // 2. Handle Text Models (Summarize / Flashcards / Quiz)
+  // 2. Text Models (Summary / Flashcards / Quiz)
   const plainText = clip(stripHtml(payload.htmlContent));
   const contextHints = clip(
     [payload.handwritingIndex, ...payload.attachmentIndex, ...payload.drawingIndex]
@@ -25,7 +154,7 @@ export async function generateWithNIM(payload: NIMRequestPayload): Promise<NIMRe
     `Indexed context: ${contextHints || 'None'}`,
   ].join('\n');
 
-  // --- SUMMARIZE ACTION (Single Request) ---
+  // --- SUMMARIZE ---
   if (payload.action === 'summarize') {
     const response = await fetch(`${NVIDIA_NIM_BASE_URL}/chat/completions`, {
       method: 'POST',
@@ -44,18 +173,20 @@ export async function generateWithNIM(payload: NIMRequestPayload): Promise<NIMRe
       }),
     });
     
-    const data = await response.json();
-    return parseAiOutput(data.choices?.[0]?.message?.content || '{}');
+    const data: any = await response.json();
+    const content = data.choices?.[0]?.message?.content || '{}';
+    const parsed = extractJsonObject(content);
+    return parsed ? JSON.parse(parsed) : { summaryPoints: [] };
   }
 
-  // --- FLASHCARDS & QUIZ ACTION (Parallel Requests) ---
+  // --- FLASHCARDS & QUIZ (Parallel Execution) ---
   const isQuiz = payload.action === 'quiz';
-  const requestCount = isQuiz ? 8 : 6; // 8 for quiz, 6 for flashcards
+  const requestCount = isQuiz ? 8 : 6; // 8 for quiz, 6 for standard flashcards
   const taskInstruction = isQuiz 
     ? 'Create exactly ONE unique, highly-detailed clinically useful Q/A flashcard for exam revision.'
     : 'Create exactly ONE unique, high-yield flashcard from the key concepts provided.';
 
-  // Create an array of N parallel promises
+  // Build array of parallel Promises
   const parallelRequests = Array.from({ length: requestCount }).map((_, index) => {
     return fetch(`${NVIDIA_NIM_BASE_URL}/chat/completions`, {
       method: 'POST',
@@ -68,20 +199,20 @@ export async function generateWithNIM(payload: NIMRequestPayload): Promise<NIMRe
         messages: [
           { 
             role: 'system', 
-            content: `You are an MBBS study assistant. ${taskInstruction} Focus on aspect #${index + 1} of the text to ensure variety. Return ONLY valid JSON: {"front": "question", "back": "answer"}` 
+            content: `You are an MBBS study assistant. ${taskInstruction} Focus on aspect #${index + 1} of the text to ensure variety. Return ONLY valid JSON exactly like this: {"front": "question", "back": "answer"}`
           },
           { role: 'user', content: contextPrompt }
         ],
-        temperature: 0.7, // Slightly higher temperature for variety across parallel requests
+        temperature: 0.7, // Higher temp to get unique questions from parallel calls
         max_tokens: 500,
       }),
     }).then(res => res.json());
   });
 
-  // Wait for all 8 requests to finish at the same time
+  // Execute all fetches concurrently
   const results = await Promise.all(parallelRequests);
   
-  // Combine the results from all parallel requests into a single array
+  // Parse and assemble results
   const combinedFlashcards: Array<{front: string, back: string}> = [];
   
   for (const data of results) {
@@ -92,8 +223,8 @@ export async function generateWithNIM(payload: NIMRequestPayload): Promise<NIMRe
         const json = JSON.parse(parsed);
         if (json.front && json.back) {
           combinedFlashcards.push({
-            front: sanitizeModelText(json.front),
-            back: sanitizeModelText(json.back)
+            front: sanitizeModelText(json.front).slice(0, AI_FLASHCARD_FRONT_CHAR_LIMIT),
+            back: sanitizeModelText(json.back).slice(0, AI_FLASHCARD_BACK_CHAR_LIMIT)
           });
         }
       } catch (e) {
