@@ -19,8 +19,18 @@ interface Actions {
   // Navigation
   setActiveView: (view: AppView) => void;
   setSidebarOpen: (open: boolean) => void;
+  setNotesListOpen: (open: boolean) => void;
   setSearchQuery: (q: string) => void;
   setActiveTag: (tag: string | null) => void;
+  setSelectedSystemSection: (section: AppState['selectedSystemSection']) => void;
+  setNotesSort: (sort: AppState['notesSort']) => void;
+  setNotesFilter: (filter: AppState['notesFilter']) => void;
+  setLayoutSidebarWidth: (width: number) => void;
+  setLayoutNotesWidth: (width: number) => void;
+  setSyncStatus: (status: AppState['syncStatus']) => void;
+  setSyncPanelOpen: (open: boolean) => void;
+  setCommandPaletteOpen: (open: boolean) => void;
+  setEditorFocusMode: (enabled: boolean) => void;
   selectNotebook: (id: string | null) => void;
   selectSubject: (id: string | null) => void;
   selectTopic: (id: string | null) => void;
@@ -34,11 +44,13 @@ interface Actions {
   // Subjects
   addSubject: (notebookId: string, name: string) => Subject;
   updateSubject: (id: string, patch: Partial<Subject>) => void;
+  moveSubject: (id: string, targetNotebookId: string) => void;
   deleteSubject: (id: string) => void;
 
   // Topics
   addTopic: (subjectId: string, name: string) => Topic;
   updateTopic: (id: string, patch: Partial<Topic>) => void;
+  moveTopic: (id: string, targetSubjectId: string) => void;
   deleteTopic: (id: string) => void;
 
   // Notes
@@ -51,6 +63,7 @@ interface Actions {
   }) => Note;
   updateNote: (id: string, patch: Partial<Note>) => void;
   deleteNote: (id: string) => void;
+  restoreNote: (id: string) => void;
   toggleFavorite: (id: string) => void;
   togglePin: (id: string) => void;
   addTagToNote: (noteId: string, tag: string) => void;
@@ -240,8 +253,18 @@ const initialState: AppState = {
   selectedTopicId: null,
   selectedNoteId: null,
   sidebarOpen: true,
+  notesListOpen: true,
   searchQuery: '',
   activeTag: null,
+  selectedSystemSection: null,
+  notesSort: 'recent',
+  notesFilter: 'all',
+  layoutSidebarWidth: 292,
+  layoutNotesWidth: 320,
+  syncStatus: 'synced',
+  syncPanelOpen: false,
+  commandPaletteOpen: false,
+  editorFocusMode: false,
 };
 
 export const useStore = create<AppState & Actions>()(
@@ -251,8 +274,18 @@ export const useStore = create<AppState & Actions>()(
 
       setActiveView: (view) => set({ activeView: view }),
       setSidebarOpen: (open) => set({ sidebarOpen: open }),
+      setNotesListOpen: (open) => set({ notesListOpen: open }),
       setSearchQuery: (q) => set({ searchQuery: q }),
       setActiveTag: (tag) => set({ activeTag: tag }),
+      setSelectedSystemSection: (selectedSystemSection) => set({ selectedSystemSection }),
+      setNotesSort: (notesSort) => set({ notesSort }),
+      setNotesFilter: (notesFilter) => set({ notesFilter }),
+      setLayoutSidebarWidth: (width) => set({ layoutSidebarWidth: Math.min(420, Math.max(220, width)) }),
+      setLayoutNotesWidth: (width) => set({ layoutNotesWidth: Math.min(460, Math.max(260, width)) }),
+      setSyncStatus: (syncStatus) => set({ syncStatus }),
+      setSyncPanelOpen: (syncPanelOpen) => set({ syncPanelOpen }),
+      setCommandPaletteOpen: (commandPaletteOpen) => set({ commandPaletteOpen }),
+      setEditorFocusMode: (editorFocusMode) => set({ editorFocusMode }),
       selectNotebook: (id) => set({ selectedNotebookId: id, selectedSubjectId: null, selectedTopicId: null }),
       selectSubject: (id) => set({ selectedSubjectId: id, selectedTopicId: null }),
       selectTopic: (id) => set({ selectedTopicId: id }),
@@ -320,6 +353,38 @@ export const useStore = create<AppState & Actions>()(
             sub.id === id ? { ...sub, ...patch, updatedAt: new Date().toISOString() } : sub
           ),
         })),
+      moveSubject: (id, targetNotebookId) =>
+        set((s) => {
+          const subject = s.subjects.find((sub) => sub.id === id);
+          if (!subject || subject.notebookId === targetNotebookId) return s;
+          const targetNotebook = s.notebooks.find((nb) => nb.id === targetNotebookId);
+          if (!targetNotebook) return s;
+          return {
+            subjects: s.subjects.map((sub) =>
+              sub.id === id ? { ...sub, notebookId: targetNotebookId, updatedAt: new Date().toISOString() } : sub
+            ),
+            notebooks: s.notebooks.map((nb) => {
+              if (nb.id === subject.notebookId) {
+                return {
+                  ...nb,
+                  subjectIds: nb.subjectIds.filter((subId) => subId !== id),
+                  updatedAt: new Date().toISOString(),
+                };
+              }
+              if (nb.id === targetNotebookId && !nb.subjectIds.includes(id)) {
+                return {
+                  ...nb,
+                  subjectIds: [...nb.subjectIds, id],
+                  updatedAt: new Date().toISOString(),
+                };
+              }
+              return nb;
+            }),
+            notes: s.notes.map((note) =>
+              note.subjectId === id ? { ...note, notebookId: targetNotebookId, updatedAt: new Date().toISOString() } : note
+            ),
+          };
+        }),
       deleteSubject: (id) =>
         set((s) => {
           const sub = s.subjects.find((x) => x.id === id);
@@ -364,6 +429,45 @@ export const useStore = create<AppState & Actions>()(
             t.id === id ? { ...t, ...patch, updatedAt: new Date().toISOString() } : t
           ),
         })),
+      moveTopic: (id, targetSubjectId) =>
+        set((s) => {
+          const topic = s.topics.find((t) => t.id === id);
+          if (!topic || topic.subjectId === targetSubjectId) return s;
+          const targetSubject = s.subjects.find((sub) => sub.id === targetSubjectId);
+          if (!targetSubject) return s;
+          return {
+            topics: s.topics.map((t) =>
+              t.id === id ? { ...t, subjectId: targetSubjectId, updatedAt: new Date().toISOString() } : t
+            ),
+            subjects: s.subjects.map((sub) => {
+              if (sub.id === topic.subjectId) {
+                return {
+                  ...sub,
+                  topicIds: sub.topicIds.filter((topicId) => topicId !== id),
+                  updatedAt: new Date().toISOString(),
+                };
+              }
+              if (sub.id === targetSubjectId && !sub.topicIds.includes(id)) {
+                return {
+                  ...sub,
+                  topicIds: [...sub.topicIds, id],
+                  updatedAt: new Date().toISOString(),
+                };
+              }
+              return sub;
+            }),
+            notes: s.notes.map((note) =>
+              note.topicId === id
+                ? {
+                    ...note,
+                    subjectId: targetSubjectId,
+                    notebookId: targetSubject.notebookId,
+                    updatedAt: new Date().toISOString(),
+                  }
+                : note
+            ),
+          };
+        }),
       deleteTopic: (id) =>
         set((s) => {
           const topic = s.topics.find((t) => t.id === id);
@@ -422,13 +526,17 @@ export const useStore = create<AppState & Actions>()(
         })),
       deleteNote: (id) =>
         set((s) => ({
-          notes: s.notes
-            .filter((n) => n.id !== id)
-            .map((n) => ({
-              ...n,
-              linkedNoteIds: n.linkedNoteIds.filter((lid) => lid !== id),
-            })),
-          topics: s.topics.map((t) => ({ ...t, noteIds: t.noteIds.filter((nid) => nid !== id) })),
+          notes: s.notes.map((n) =>
+            n.id === id
+              ? { ...n, isTrashed: true, updatedAt: new Date().toISOString() }
+              : { ...n, linkedNoteIds: n.linkedNoteIds.filter((lid) => lid !== id) }
+          ),
+        })),
+      restoreNote: (id) =>
+        set((s) => ({
+          notes: s.notes.map((n) =>
+            n.id === id ? { ...n, isTrashed: false, updatedAt: new Date().toISOString() } : n
+          ),
         })),
       toggleFavorite: (id) =>
         set((s) => ({
@@ -640,14 +748,15 @@ export const useStore = create<AppState & Actions>()(
         if (!state || !Array.isArray(state.notes)) return persisted as AppState;
         return {
           ...state,
-          notes: state.notes.map((n) => ({
-            ...n,
-            attachments: n.attachments ?? [],
-            drawings: n.drawings ?? [],
-            handwritingIndex: n.handwritingIndex ?? '',
-          })),
-        };
-      },
+            notes: state.notes.map((n) => ({
+              ...n,
+              attachments: n.attachments ?? [],
+              drawings: n.drawings ?? [],
+              handwritingIndex: n.handwritingIndex ?? '',
+              isTrashed: n.isTrashed ?? false,
+            })),
+          };
+        },
     }
   )
 );

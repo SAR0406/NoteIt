@@ -5,7 +5,7 @@ import { useStore } from '@/store/useStore';
 import { CloudUpload, Download, ShieldCheck } from 'lucide-react';
 import toast from 'react-hot-toast';
 
-export function SyncView() {
+export function SyncView({ mode = 'page' }: { mode?: 'page' | 'panel' }) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const notebooks = useStore((s) => s.notebooks);
   const subjects = useStore((s) => s.subjects);
@@ -13,7 +13,10 @@ export function SyncView() {
   const notes = useStore((s) => s.notes);
   const flashcards = useStore((s) => s.flashcards);
 
+  const setSyncStatus = useStore((s) => s.setSyncStatus);
+
   const exportBackup = () => {
+    setSyncStatus('syncing');
     const payload = {
       version: 1,
       exportedAt: new Date().toISOString(),
@@ -32,6 +35,7 @@ export function SyncView() {
     anchor.download = `noteit-backup-${new Date().toISOString().slice(0, 10)}.json`;
     anchor.click();
     URL.revokeObjectURL(url);
+    setSyncStatus('synced');
     toast.success('Backup exported');
   };
 
@@ -39,6 +43,7 @@ export function SyncView() {
     const file = event.target.files?.[0];
     if (!file) return;
     try {
+      setSyncStatus('syncing');
       const text = await file.text();
       const parsed = JSON.parse(text) as {
         data?: {
@@ -57,9 +62,11 @@ export function SyncView() {
           version: 2,
         })
       );
+      setSyncStatus('synced');
       toast.success('Backup imported. Reloading...');
       setTimeout(() => window.location.reload(), 600);
     } catch {
+      setSyncStatus('error');
       toast.error('Failed to import backup');
     } finally {
       event.currentTarget.value = '';
@@ -67,8 +74,8 @@ export function SyncView() {
   };
 
   return (
-    <div className="flex-1 overflow-y-auto bg-gray-50 p-6">
-      <div className="max-w-3xl mx-auto">
+    <div className={`flex-1 overflow-y-auto ${mode === 'page' ? 'bg-gray-50 p-6' : 'bg-transparent p-0'}`}>
+      <div className={`${mode === 'page' ? 'max-w-3xl mx-auto' : ''}`}>
         <h1 className="text-2xl font-bold text-gray-800 mb-1">Cross-device Sync</h1>
         <p className="text-sm text-gray-500 mb-8">Use encrypted local backups to move notes between iPad, phone, and laptop.</p>
 
