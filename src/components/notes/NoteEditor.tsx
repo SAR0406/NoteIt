@@ -87,7 +87,12 @@ export function NoteEditor() {
     if (!editor) return;
     const dom = editor.view.dom;
     const handler = (event: KeyboardEvent) => {
-      if (event.key === '/') setShowSlashMenu(true);
+      if (event.key === '/') {
+        const { $from } = editor.state.selection;
+        const textBefore = $from.parent.textBetween(0, $from.parentOffset, undefined, '\ufffc');
+        const atCommandBoundary = textBefore.length === 0 || /\s$/.test(textBefore);
+        setShowSlashMenu(atCommandBoundary);
+      }
       if (event.key === 'Escape') setShowSlashMenu(false);
     };
     dom.addEventListener('keydown', handler);

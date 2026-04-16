@@ -533,13 +533,24 @@ export const useStore = create<AppState & Actions>()(
               ? { ...n, isTrashed: true, updatedAt: new Date().toISOString() }
               : { ...n, linkedNoteIds: n.linkedNoteIds.filter((lid) => lid !== id) }
           ),
+          topics: s.topics.map((t) => ({ ...t, noteIds: t.noteIds.filter((nid) => nid !== id) })),
         })),
       restoreNote: (id) =>
-        set((s) => ({
-          notes: s.notes.map((n) =>
-            n.id === id ? { ...n, isTrashed: false, updatedAt: new Date().toISOString() } : n
-          ),
-        })),
+        set((s) => {
+          const note = s.notes.find((n) => n.id === id);
+          if (!note) return s;
+          return {
+            notes: s.notes.map((n) =>
+              n.id === id ? { ...n, isTrashed: false, updatedAt: new Date().toISOString() } : n
+            ),
+            topics: s.topics.map((t) => {
+              if (note.topicId && t.id === note.topicId && !t.noteIds.includes(id)) {
+                return { ...t, noteIds: [...t.noteIds, id], updatedAt: new Date().toISOString() };
+              }
+              return t;
+            }),
+          };
+        }),
       toggleFavorite: (id) =>
         set((s) => ({
           notes: s.notes.map((n) => (n.id === id ? { ...n, isFavorite: !n.isFavorite } : n)),
