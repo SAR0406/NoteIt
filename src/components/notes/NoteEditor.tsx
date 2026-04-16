@@ -6,13 +6,15 @@ import StarterKit from '@tiptap/starter-kit';
 import Highlight from '@tiptap/extension-highlight';
 import Underline from '@tiptap/extension-underline';
 import { TextStyle } from '@tiptap/extension-text-style';
+import Color from '@tiptap/extension-color';
+import Image from '@tiptap/extension-image';
 import Link from '@tiptap/extension-link';
-import Image from '@tiptap/extension-image'; // <-- NEW: Required to render images!
 import { useStore } from '@/store/useStore';
 import {
   Bold, Italic, Underline as UnderlineIcon, Highlighter, List, ListOrdered,
   Heading1, Heading2, Heading3, Link as LinkIcon, Minus, Star, Pin, Tag,
   Trash2, Brain, Sparkles, BookOpen, X, AlignLeft, Code, Quote, PanelRightOpen, Focus,
+  Image as ImageIcon, Palette, Type
 } from 'lucide-react';
 import { MEDICAL_TAGS } from '@/lib/templates';
 import { formatDate } from '@/lib/utils';
@@ -26,7 +28,7 @@ import { FloatingToolbar, PillButton, SplitPane, TimelineRail } from '@/componen
 
 type AIAction = 'summarize' | 'flashcards' | 'quiz' | 'diagram' | 'image-convert' | '3d';
 type GenerationModel = 'black-forest-labs/flux.2-klein-4b' | 'microsoft/trellis';
-type SlashCommand = 'todo' | 'code' | 'heading';
+type SlashCommand = 'todo' | 'code' | 'heading' | 'image';
 const SLASH_COMMAND_TODO_TEXT = '☐ To-do item';
 
 interface GeneratedAsset {
@@ -65,16 +67,12 @@ export function NoteEditor() {
     {
       extensions: [
         StarterKit.configure({ underline: false, link: false }),
-        Highlight.configure({ multicolor: false }),
+        Highlight.configure({ multicolor: true }), // ENABLES MULTICOLOR HIGHLIGHTS
         Underline,
         TextStyle,
+        Color, // ENABLES MULTICOLOR TEXT
+        Image.configure({ inline: true, allowBase64: true }), // ENABLES IMAGES
         Link.configure({ openOnClick: false, HTMLAttributes: { class: 'text-blue-600 underline' } }),
-        Image.configure({
-          inline: true,
-          HTMLAttributes: {
-            class: 'rounded-2xl shadow-xl border border-gray-100 max-w-full h-auto my-6 transition-transform hover:scale-[1.01]',
-          },
-        }),
       ],
       content: note?.content ?? '',
       onUpdate: ({ editor: currentEditor }) => {
@@ -84,8 +82,8 @@ export function NoteEditor() {
       },
       editorProps: {
         attributes: {
-          // CREATIVE STYLING: Beautiful typography, custom blockquotes, styled images, and smooth padding
-          class: 'prose prose-sm sm:prose-base max-w-none focus:outline-none min-h-full px-4 pb-20 prose-headings:font-bold prose-headings:text-[var(--text-primary)] prose-a:text-purple-600 prose-blockquote:border-l-4 prose-blockquote:border-purple-400 prose-blockquote:bg-purple-50/50 prose-blockquote:px-5 prose-blockquote:py-2 prose-blockquote:rounded-r-xl prose-blockquote:not-italic prose-blockquote:text-purple-900 prose-img:mx-auto prose-hr:border-gray-200 prose-hr:my-8',
+          // Creative dotted canvas background for the writing pad
+          class: 'prose prose-sm max-w-none focus:outline-none min-h-[600px] px-8 py-6 bg-[radial-gradient(#e5e7eb_2px,transparent_2px)] [background-size:24px_24px] bg-white rounded-2xl shadow-sm border border-gray-100',
         },
       },
     },
@@ -125,10 +123,19 @@ export function NoteEditor() {
       editor.chain().focus().insertContent(SLASH_COMMAND_TODO_TEXT).run();
     } else if (cmd === 'code') {
       editor.chain().focus().toggleCodeBlock().run();
+    } else if (cmd === 'image') {
+      addImage();
     } else {
       editor.chain().focus().toggleHeading({ level: 2 }).run();
     }
     setShowSlashMenu(false);
+  };
+
+  const addImage = () => {
+    const url = window.prompt('Enter Image URL or Paste Base64:');
+    if (url && editor) {
+      editor.chain().focus().setImage({ src: url }).run();
+    }
   };
 
   const applyLocalFallback = (action: 'summarize' | 'flashcards' | 'quiz') => {
@@ -141,12 +148,7 @@ export function NoteEditor() {
   const toSafeUrl = (value?: string) => {
     if (!value) return '';
     const normalized = value.replace(/\s+/g, '');
-    if (
-      normalized.startsWith('https://') || 
-      normalized.startsWith('http://') || 
-      normalized.startsWith('data:image/') ||
-      normalized.startsWith('data:application/')
-    ) {
+    if (normalized.startsWith('https://') || normalized.startsWith('http://') || normalized.startsWith('data:image/') || normalized.startsWith('data:application/')) {
       return normalized;
     }
     return '';
@@ -155,25 +157,20 @@ export function NoteEditor() {
   const insertGeneratedAsset = () => {
     if (!generatedAsset || !editor) return;
     
-    // CREATIVE INSERTION HTML: Makes the AI result look like a beautiful showcase card in the notes
-    const resultHtml = `
-      <blockquote>
-        <p>✨ <strong>${escapeHtml(generatedAsset.title)}</strong><br/>
-        <span style="color: #6b7280; font-size: 0.9em;">"${escapeHtml(generatedAsset.prompt)}"</span></p>
-      </blockquote>
-      ${generatedAsset.previewImage ? `<img src="${generatedAsset.previewImage}" alt="AI Generated" />` : ''}
-      ${generatedAsset.assetUrl && generatedAsset.assetUrl !== generatedAsset.previewImage 
-        ? `<p>🧊 <a href="${escapeHtml(generatedAsset.assetUrl)}" target="_blank" rel="noreferrer"><strong>Download 3D Model Asset</strong></a></p>` 
-        : ''}
-      <p style="color: #9ca3af; font-size: 0.8em; text-align: center;">Generated by ${escapeHtml(generatedAsset.model)}</p>
-      <hr />
-      <p></p>
-    `;
+    const resultHtml = [
+      `<div style="padding: 10px; background: #f9fafb; border-radius: 12px; margin: 10px 0;">`,
+      `<h3 style="margin-top: 0; color: #4f46e5;">✨ ${generatedAsset.title}</h3>`,
+      `<p style="font-size: 0.85em; color: #6b7280; margin-bottom: 10px;"><strong>Prompt:</strong> ${escapeHtml(generatedAsset.prompt)}</p>`,
+      generatedAsset.previewImage ? `<img src="${escapeHtml(generatedAsset.previewImage)}" alt="Generated output" style="border-radius: 8px; width: 100%; max-width: 500px;" />` : '',
+      generatedAsset.assetUrl && generatedAsset.assetUrl !== generatedAsset.previewImage 
+        ? `<p style="margin-top: 10px;"><a href="${escapeHtml(generatedAsset.assetUrl)}" target="_blank" rel="noreferrer" style="color: #2563eb; font-weight: bold;">➡️ Open full 3D Asset</a></p>` 
+        : '',
+      `</div>`
+    ].join('');
 
-    // Insert beautifully at the cursor location!
     editor.chain().focus().insertContent(resultHtml).run();
     setGeneratedAsset(null);
-    toast.success('Inserted beautifully into your note! ✨');
+    toast.success('Inserted into creative canvas!');
   };
 
   const handleAI = async (action: AIAction) => {
@@ -183,23 +180,17 @@ export function NoteEditor() {
     const model: GenerationModel = action === '3d' ? 'microsoft/trellis' : 'black-forest-labs/flux.2-klein-4b';
 
     if (action === 'diagram') {
-      const input = window.prompt(
-        'What should be generated? (example: human heart, human kidney, human brain)',
-        note.title || 'human heart'
-      );
+      const input = window.prompt('What should be generated? (e.g. realistic human heart, conceptual diagram)', note.title || '');
       if (!input?.trim()) return;
       prompt = input.trim();
     }
     if (action === '3d') {
-      const input = window.prompt('Describe the 3D model to generate', `Generate a detailed 3D model for "${note.title}"`);
+      const input = window.prompt('Describe the 3D model to generate:', `Generate a detailed 3D model for "${note.title}"`);
       if (!input?.trim()) return;
       prompt = input.trim();
     }
     if (action === 'image-convert') {
-      const subjectPrompt = window.prompt(
-        'Describe the anatomy in the source image for clean study-style editing',
-        note.title || 'human heart'
-      );
+      const subjectPrompt = window.prompt('Describe the target style/anatomy:', note.title || '');
       if (!subjectPrompt?.trim()) return;
       const sourceImage = window.prompt('Paste source image as data URL (data:image/...)');
       if (!sourceImage?.startsWith('data:image/')) {
@@ -219,36 +210,16 @@ export function NoteEditor() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action,
-          model,
-          prompt,
-          image,
-          note: {
-            title: note.title,
-            content: note.content,
-            tags: note.tags,
-            handwritingIndex: note.handwritingIndex,
-            attachments: note.attachments,
-            drawings: note.drawings,
-          },
+          action, model, prompt, image,
+          note: { title: note.title, content: note.content, tags: note.tags, handwritingIndex: note.handwritingIndex, attachments: note.attachments, drawings: note.drawings },
         }),
       });
 
       if (!response.ok) {
-        const err = (await response.json().catch(() => null)) as { error?: string } | null;
-        throw new Error(err?.error || 'AI provider unavailable');
+        throw new Error('AI provider unavailable');
       }
 
-      const data = (await response.json()) as {
-        summaryPoints?: string[];
-        flashcards?: Array<{ front: string; back: string }>;
-        generated?: {
-          model?: string;
-          previewImage?: string;
-          assetUrl?: string;
-          raw?: any;
-        } | null;
-      };
+      const data = await response.json();
 
       if (action === 'summarize') {
         const points = (data.summaryPoints ?? []).filter(Boolean).slice(0, AI_SUMMARY_POINT_LIMIT);
@@ -257,31 +228,20 @@ export function NoteEditor() {
           setAiState('fallback');
           toast.success('Summary added (local fallback)');
         } else {
-          // Styled AI Summary Block
-          const summaryHtml = `
-            <blockquote>
-              <p>✨ <strong>AI Summary</strong></p>
-            </blockquote>
-            <ul>${points.map((point) => `<li>${escapeHtml(point)}</li>`).join('')}</ul>
-            <hr/>
-          `;
+          const summaryHtml = `<div style="background:#f0f9ff; padding:15px; border-radius:12px; margin: 15px 0;"><h3>📝 AI Summary</h3><ul>${points.map((point: string) => `<li>${escapeHtml(point)}</li>`).join('')}</ul></div>`;
           updateNote(note.id, { content: `${note.content}${summaryHtml}` });
           setAiState('success');
-          toast.success('NVIDIA NIM summary added!');
+          toast.success('Summary embedded!');
         }
       } else if (action === 'flashcards' || action === 'quiz') {
-        const cards = (data.flashcards ?? [])
-          .filter((c) => c.front && c.back)
-          .slice(0, action === 'quiz' ? AI_QUIZ_CARD_LIMIT : AI_FLASHCARD_CARD_LIMIT);
-          
+        const cards = (data.flashcards ?? []).filter((c: any) => c.front && c.back).slice(0, action === 'quiz' ? AI_QUIZ_CARD_LIMIT : AI_FLASHCARD_CARD_LIMIT);
         if (cards.length === 0) {
           applyLocalFallback(action);
           setAiState('fallback');
-          toast.success(`${action === 'quiz' ? 'Quiz' : 'Flashcards'} generated (local fallback)`);
         } else {
-          cards.forEach((card) => addFlashcard(card.front, card.back, note.id, note.tags));
+          cards.forEach((card: any) => addFlashcard(card.front, card.back, note.id, note.tags));
           setAiState('success');
-          toast.success(`NVIDIA NIM ${action === 'quiz' ? 'quiz cards' : 'flashcards'} generated (${cards.length})!`);
+          toast.success(`NVIDIA NIM generated ${cards.length} cards!`);
         }
       } else {
         const rawObj = data.generated?.raw || {};
@@ -294,18 +254,16 @@ export function NoteEditor() {
         if (!safePreview && rawB64) {
           safePreview = rawB64.startsWith('data:') ? rawB64 : `data:image/jpeg;base64,${rawB64}`;
         }
-        if (!safeAsset && safePreview) {
-          safeAsset = safePreview;
-        }
+        if (!safeAsset && safePreview) safeAsset = safePreview;
 
         if (!safePreview && !safeAsset) {
           setAiState('fallback');
           toast.error('Generation completed but no preview URL was returned.');
         } else {
           const titleByAction: Record<'diagram' | 'image-convert' | '3d', string> = {
-            diagram: '🖼️ AI Generated Creation',
-            'image-convert': '🎨 AI Style Conversion',
-            '3d': '🧊 AI 3D Model',
+            diagram: '🖼️ AI Diagram Generation',
+            'image-convert': '🎨 AI Image Conversion',
+            '3d': '🧊 AI 3D Generation',
           };
           
           setGeneratedAsset({
@@ -317,19 +275,13 @@ export function NoteEditor() {
             action,
           });
           setAiState('success');
-          toast.success('Asset ready! Review in the AI panel.');
+          toast.success('Creative asset ready! Review in the AI panel.');
         }
       }
     } catch (e) {
-      console.error("Editor AI Generation Error:", e);
-      if (action === 'summarize' || action === 'flashcards' || action === 'quiz') {
-        applyLocalFallback(action);
-        setAiState('fallback');
-        toast.success(`${action === 'quiz' ? 'Quiz' : action === 'summarize' ? 'Summary' : 'Flashcards'} generated (local fallback)`);
-      } else {
-        setAiState('retry');
-        toast.error('NVIDIA generation failed. Check console for details.');
-      }
+      console.error(e);
+      setAiState('retry');
+      toast.error('Generation failed.');
     }
     setAiLoading(false);
   };
@@ -338,16 +290,9 @@ export function NoteEditor() {
     return (
       <div className="flex-1 flex flex-col items-center justify-center text-gray-400 bg-white">
         <BookOpen size={56} className="mb-4 opacity-30" />
-        <p className="text-lg font-medium text-gray-600">Select a note to edit</p>
-        <p className="text-sm mt-1">Or create a new note from the sidebar</p>
-        <button
-          onClick={() => {
-            const n = addNote({ topicId: selectedTopicId, subjectId: selectedSubjectId, notebookId: selectedNotebookId });
-            selectNote(n.id);
-          }}
-          className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
-        >
-          + New Note
+        <p className="text-lg font-medium text-gray-600">Select a canvas to edit</p>
+        <button onClick={() => { const n = addNote({ topicId: selectedTopicId, subjectId: selectedSubjectId, notebookId: selectedNotebookId }); selectNote(n.id); }} className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm">
+          + New Canvas Note
         </button>
       </div>
     );
@@ -358,337 +303,160 @@ export function NoteEditor() {
   const hasSelection = editor ? !editor.state.selection.empty : false;
 
   return (
-    <div className="flex-1 flex flex-col bg-[var(--surface)] overflow-hidden relative">
-      <div className="border-b border-[var(--border)] bg-[var(--surface)] px-4 py-3 space-y-2 shrink-0">
+    <div className="flex-1 flex flex-col bg-gray-50 overflow-hidden relative">
+      {/* CREATIVE TOOLBAR */}
+      <div className="border-b border-gray-200 bg-white px-4 py-3 space-y-2 shrink-0 z-10 shadow-sm">
         <FloatingToolbar>
-          <ToolbarBtn onClick={() => editor?.chain().focus().toggleBold().run()} active={editor?.isActive('bold')} title="Bold">
-          <Bold size={15} />
-        </ToolbarBtn>
-        <ToolbarBtn onClick={() => editor?.chain().focus().toggleItalic().run()} active={editor?.isActive('italic')} title="Italic">
-          <Italic size={15} />
-        </ToolbarBtn>
-        <ToolbarBtn onClick={() => editor?.chain().focus().toggleUnderline().run()} active={editor?.isActive('underline')} title="Underline">
-          <UnderlineIcon size={15} />
-        </ToolbarBtn>
-        <ToolbarBtn onClick={() => editor?.chain().focus().toggleHighlight().run()} active={editor?.isActive('highlight')} title="Highlight">
-          <Highlighter size={15} />
-        </ToolbarBtn>
-        <div className="w-px h-5 bg-[var(--border)] mx-1" />
-        <ToolbarBtn onClick={() => editor?.chain().focus().toggleHeading({ level: 1 }).run()} active={editor?.isActive('heading', { level: 1 })} title="H1">
-          <Heading1 size={15} />
-        </ToolbarBtn>
-        <ToolbarBtn onClick={() => editor?.chain().focus().toggleHeading({ level: 2 }).run()} active={editor?.isActive('heading', { level: 2 })} title="H2">
-          <Heading2 size={15} />
-        </ToolbarBtn>
-        <ToolbarBtn onClick={() => editor?.chain().focus().toggleHeading({ level: 3 }).run()} active={editor?.isActive('heading', { level: 3 })} title="H3">
-          <Heading3 size={15} />
-        </ToolbarBtn>
-        <div className="w-px h-5 bg-[var(--border)] mx-1" />
-        <ToolbarBtn onClick={() => editor?.chain().focus().toggleBulletList().run()} active={editor?.isActive('bulletList')} title="Bullet list">
-          <List size={15} />
-        </ToolbarBtn>
-        <ToolbarBtn onClick={() => editor?.chain().focus().toggleOrderedList().run()} active={editor?.isActive('orderedList')} title="Ordered list">
-          <ListOrdered size={15} />
-        </ToolbarBtn>
-        <ToolbarBtn onClick={() => editor?.chain().focus().toggleBlockquote().run()} active={editor?.isActive('blockquote')} title="Quote">
-          <Quote size={15} />
-        </ToolbarBtn>
-        <ToolbarBtn onClick={() => editor?.chain().focus().toggleCode().run()} active={editor?.isActive('code')} title="Code">
-          <Code size={15} />
-        </ToolbarBtn>
-        <ToolbarBtn onClick={() => editor?.chain().focus().setHorizontalRule().run()} title="Horizontal rule">
-          <Minus size={15} />
-        </ToolbarBtn>
-        <div className="w-px h-5 bg-[var(--border)] mx-1" />
-
-        <div className="ml-auto flex items-center gap-1">
-          <button
-            onClick={() => setSplitMode((v) => !v)}
-            className={`p-1.5 rounded hover:bg-[var(--surface-muted)] ${splitMode ? 'text-indigo-600' : 'text-[var(--text-muted)]'}`}
-            title="Split-screen mode"
-          >
-            <PanelRightOpen size={15} />
-          </button>
-          <button
-            onClick={() => setEditorFocusMode(!editorFocusMode)}
-            className={`p-1.5 rounded hover:bg-[var(--surface-muted)] ${editorFocusMode ? 'text-indigo-600' : 'text-[var(--text-muted)]'}`}
-            title="Toggle focus mode"
-          >
-            <Focus size={15} />
-          </button>
-          <button
-            onClick={() => toggleFavorite(note.id)}
-            className={`p-1.5 rounded hover:bg-[var(--surface-muted)] ${note.isFavorite ? 'text-yellow-500' : 'text-[var(--text-muted)]'}`}
-            title="Toggle favorite"
-          >
-            <Star size={15} className={note.isFavorite ? 'fill-yellow-500' : ''} />
-          </button>
-          <button
-            onClick={() => togglePin(note.id)}
-            className={`p-1.5 rounded hover:bg-[var(--surface-muted)] ${note.isPinned ? 'text-blue-600' : 'text-[var(--text-muted)]'}`}
-            title="Toggle pin"
-          >
-            <Pin size={15} />
-          </button>
-
-          <div className="relative">
-            <button
-              onClick={() => setShowTagDropdown((v) => !v)}
-              className="p-1.5 rounded hover:bg-[var(--surface-muted)] text-[var(--text-muted)]"
-              title="Tags"
-            >
-              <Tag size={15} />
-            </button>
-            {showTagDropdown && (
-              <div className="absolute right-0 top-full mt-1 w-52 bg-white border border-[var(--border)] rounded-xl shadow-lg z-50 p-2">
-                <p className="text-xs font-semibold text-[var(--text-muted)] px-2 mb-1">Current tags</p>
-                <div className="flex flex-wrap gap-1 px-2 mb-2">
-                  {note.tags.map((tag) => (
-                    <span key={tag} className="flex items-center gap-1 text-xs bg-[var(--primary-100)] text-[var(--primary-600)] px-2 py-0.5 rounded-full">
-                      {tag}
-                      <button onClick={() => removeTagFromNote(note.id, tag)} className="hover:text-red-500">
-                        <X size={10} />
-                      </button>
-                    </span>
-                  ))}
-                </div>
-                <p className="text-xs font-semibold text-[var(--text-muted)] px-2 mb-1">Add tag</p>
-                <div className="max-h-32 overflow-y-auto">
-                  {MEDICAL_TAGS.filter((t) => !note.tags.includes(t)).map((tag) => (
-                    <button
-                      key={tag}
-                      onClick={() => addTagToNote(note.id, tag)}
-                      className="w-full text-left text-xs px-2 py-1 hover:bg-[var(--surface-muted)] rounded"
-                    >
-                      {tag}
-                    </button>
-                  ))}
-                </div>
-                <div className="flex gap-1 mt-2 px-2">
-                  <input
-                    className="flex-1 text-xs border border-[var(--border)] rounded px-2 py-1 outline-none"
-                    placeholder="Custom tag..."
-                    value={customTag}
-                    onChange={(e) => setCustomTag(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && customTag.trim()) {
-                        addTagToNote(note.id, customTag.trim().startsWith('#') ? customTag.trim() : `#${customTag.trim()}`);
-                        setCustomTag('');
-                      }
-                    }}
-                  />
-                </div>
-              </div>
-            )}
+          <ToolbarBtn onClick={() => editor?.chain().focus().toggleBold().run()} active={editor?.isActive('bold')} title="Bold"><Bold size={15} /></ToolbarBtn>
+          <ToolbarBtn onClick={() => editor?.chain().focus().toggleItalic().run()} active={editor?.isActive('italic')} title="Italic"><Italic size={15} /></ToolbarBtn>
+          <ToolbarBtn onClick={() => editor?.chain().focus().toggleUnderline().run()} active={editor?.isActive('underline')} title="Underline"><UnderlineIcon size={15} /></ToolbarBtn>
+          
+          <div className="w-px h-5 bg-gray-200 mx-1" />
+          
+          {/* MULTICOLOR TEXT & HIGHLIGHT PICKERS */}
+          <div className="flex items-center gap-1 relative overflow-hidden group rounded hover:bg-gray-100 p-1">
+            <Type size={14} className="text-gray-500 pointer-events-none" />
+            <input 
+              type="color" 
+              className="w-5 h-5 p-0 border-0 cursor-pointer bg-transparent rounded"
+              onChange={(e) => editor?.chain().focus().setColor(e.target.value).run()}
+              title="Text Color"
+            />
+          </div>
+          <div className="flex items-center gap-1 relative overflow-hidden group rounded hover:bg-gray-100 p-1">
+            <Highlighter size={14} className="text-gray-500 pointer-events-none" />
+            <input 
+              type="color" 
+              defaultValue="#ffff00"
+              className="w-5 h-5 p-0 border-0 cursor-pointer bg-transparent rounded"
+              onChange={(e) => editor?.chain().focus().toggleHighlight({ color: e.target.value }).run()}
+              title="Highlight Color"
+            />
           </div>
 
-          <div className="relative">
-            <button
-              onClick={() => setShowLinkDropdown((v) => !v)}
-              className="p-1.5 rounded hover:bg-[var(--surface-muted)] text-[var(--text-muted)]"
-              title="Link notes"
-            >
-              <LinkIcon size={15} />
-            </button>
-            {showLinkDropdown && (
-              <div className="absolute right-0 top-full mt-1 w-56 bg-white border border-[var(--border)] rounded-xl shadow-lg z-50 p-2">
-                <p className="text-xs font-semibold text-[var(--text-muted)] px-2 mb-1">Linked notes</p>
-                {linkedNotes.map((n) => (
-                  <div key={n.id} className="flex items-center justify-between px-2 py-1 hover:bg-[var(--surface-muted)] rounded">
-                    <span className="text-xs text-[var(--text-secondary)] truncate flex-1">{n.title}</span>
-                    <button onClick={() => unlinkNote(note.id, n.id)} className="text-[var(--text-muted)] hover:text-red-400 ml-1">
-                      <X size={12} />
-                    </button>
-                  </div>
-                ))}
-                {linkedNotes.length === 0 && <p className="text-xs text-[var(--text-muted)] px-2 mb-1">None</p>}
-                <p className="text-xs font-semibold text-[var(--text-muted)] px-2 mt-2 mb-1">Link to</p>
-                <div className="max-h-32 overflow-y-auto">
-                  {unlinkableNotes.map((n) => (
-                    <button
-                      key={n.id}
-                      onClick={() => linkNotes(note.id, n.id)}
-                      className="w-full text-left text-xs px-2 py-1 hover:bg-[var(--surface-muted)] rounded truncate"
-                    >
-                      + {n.title}
-                    </button>
-                  ))}
+          <div className="w-px h-5 bg-gray-200 mx-1" />
+          <ToolbarBtn onClick={() => editor?.chain().focus().toggleHeading({ level: 1 }).run()} active={editor?.isActive('heading', { level: 1 })} title="H1"><Heading1 size={15} /></ToolbarBtn>
+          <ToolbarBtn onClick={() => editor?.chain().focus().toggleHeading({ level: 2 }).run()} active={editor?.isActive('heading', { level: 2 })} title="H2"><Heading2 size={15} /></ToolbarBtn>
+          <ToolbarBtn onClick={() => editor?.chain().focus().toggleBulletList().run()} active={editor?.isActive('bulletList')} title="Bullet list"><List size={15} /></ToolbarBtn>
+          
+          <div className="w-px h-5 bg-gray-200 mx-1" />
+          {/* IMAGE INSERT BUTTON */}
+          <ToolbarBtn onClick={addImage} title="Insert Image"><ImageIcon size={15} /></ToolbarBtn>
+          <ToolbarBtn onClick={() => editor?.chain().focus().toggleCode().run()} active={editor?.isActive('code')} title="Code"><Code size={15} /></ToolbarBtn>
+
+          <div className="ml-auto flex items-center gap-1">
+            <button onClick={() => setSplitMode((v) => !v)} className={`p-1.5 rounded hover:bg-gray-100 ${splitMode ? 'text-indigo-600' : 'text-gray-400'}`} title="Split Workspace"><PanelRightOpen size={15} /></button>
+            <button onClick={() => setEditorFocusMode(!editorFocusMode)} className={`p-1.5 rounded hover:bg-gray-100 ${editorFocusMode ? 'text-indigo-600' : 'text-gray-400'}`} title="Focus mode"><Focus size={15} /></button>
+            <button onClick={() => toggleFavorite(note.id)} className={`p-1.5 rounded hover:bg-gray-100 ${note.isFavorite ? 'text-yellow-500' : 'text-gray-400'}`}><Star size={15} className={note.isFavorite ? 'fill-yellow-500' : ''} /></button>
+            <button onClick={() => togglePin(note.id)} className={`p-1.5 rounded hover:bg-gray-100 ${note.isPinned ? 'text-blue-600' : 'text-gray-400'}`}><Pin size={15} /></button>
+
+            {/* AI Menu */}
+            <div className="relative">
+              <button onClick={() => setShowAiDropdown((v) => !v)} className={`p-1.5 rounded hover:bg-purple-50 text-purple-500 ${aiLoading ? 'animate-pulse' : ''}`} title="AI Generation Tools">
+                <Sparkles size={15} />
+              </button>
+              {showAiDropdown && (
+                <div className="absolute right-0 top-full mt-1 w-64 bg-white border border-gray-200 rounded-xl shadow-xl z-50 p-2">
+                  <p className="text-[11px] text-gray-400 px-1 mb-2 font-semibold tracking-wider uppercase">Generative AI Tools</p>
+                  <button onClick={() => handleAI('summarize')} className="w-full text-left text-xs px-3 py-2 hover:bg-gray-50 rounded-lg flex items-center gap-2"><AlignLeft size={12} /> Summarize note</button>
+                  <button onClick={() => handleAI('flashcards')} className="w-full text-left text-xs px-3 py-2 hover:bg-gray-50 rounded-lg flex items-center gap-2"><Brain size={12} /> Generate flashcards</button>
+                  <button onClick={() => handleAI('quiz')} className="w-full text-left text-xs px-3 py-2 hover:bg-gray-50 rounded-lg flex items-center gap-2"><BookOpen size={12} /> Generate quiz</button>
+                  <button onClick={() => handleAI('diagram')} className="w-full text-left text-xs px-3 py-2 hover:bg-purple-50 text-purple-700 rounded-lg flex items-center gap-2"><Palette size={12} /> Generate diagram/photo (FLUX)</button>
+                  <button onClick={() => handleAI('3d')} className="w-full text-left text-xs px-3 py-2 hover:bg-purple-50 text-purple-700 rounded-lg flex items-center gap-2"><Sparkles size={12} /> Generate 3D model (Trellis)</button>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
+            <button onClick={() => { deleteNote(note.id); selectNote(null); }} className="p-1.5 rounded hover:bg-red-50 text-gray-400 hover:text-red-500"><Trash2 size={15} /></button>
           </div>
-
-          <div className="relative">
-            <button
-              onClick={() => setShowAiDropdown((v) => !v)}
-              className={`p-1.5 rounded hover:bg-purple-50 text-purple-500 ${aiLoading ? 'animate-pulse' : ''}`}
-              title="AI Tools"
-            >
-              <Sparkles size={15} />
-            </button>
-            {showAiDropdown && (
-              <div className="absolute right-0 top-full mt-1 w-64 bg-white border border-[var(--border)] rounded-xl shadow-lg z-50 p-2">
-                <p className="text-[11px] text-[var(--text-muted)] px-1 mb-2">Photo generation/editing model: FLUX.2-Klein-4B</p>
-                <button onClick={() => handleAI('summarize')} className="w-full text-left text-xs px-3 py-2 hover:bg-[var(--surface-muted)] rounded-lg flex items-center gap-2">
-                  <AlignLeft size={12} /> Summarize note
-                </button>
-                <button onClick={() => handleAI('flashcards')} className="w-full text-left text-xs px-3 py-2 hover:bg-[var(--surface-muted)] rounded-lg flex items-center gap-2">
-                  <Brain size={12} /> Generate flashcards
-                </button>
-                <button onClick={() => handleAI('quiz')} className="w-full text-left text-xs px-3 py-2 hover:bg-[var(--surface-muted)] rounded-lg flex items-center gap-2">
-                  <BookOpen size={12} /> Generate quiz
-                </button>
-                <button onClick={() => handleAI('diagram')} className="w-full text-left text-xs px-3 py-2 hover:bg-[var(--surface-muted)] rounded-lg flex items-center gap-2">
-                  <Sparkles size={12} /> Generate diagram/photo
-                </button>
-                <button onClick={() => handleAI('image-convert')} className="w-full text-left text-xs px-3 py-2 hover:bg-[var(--surface-muted)] rounded-lg flex items-center gap-2">
-                  <Sparkles size={12} /> Convert photo style (anime/Ghibli)
-                </button>
-                <button onClick={() => handleAI('3d')} className="w-full text-left text-xs px-3 py-2 hover:bg-[var(--surface-muted)] rounded-lg flex items-center gap-2">
-                  <Sparkles size={12} /> Generate 3D model (Trellis)
-                </button>
-              </div>
-            )}
-          </div>
-
-          <button
-            onClick={() => { deleteNote(note.id); selectNote(null); }}
-            className="p-1.5 rounded hover:bg-red-50 text-[var(--text-muted)] hover:text-red-500"
-            title="Delete note"
-          >
-            <Trash2 size={15} />
-          </button>
-        </div>
         </FloatingToolbar>
 
         {(hasSelection || aiLoading || aiState !== 'idle') && (
-          <div className="flex flex-wrap items-center gap-2 px-1 text-xs">
+          <div className="flex flex-wrap items-center gap-2 px-1 text-xs mt-2">
             {hasSelection && (
               <>
-                <span className="chip chip-active">Create from selection</span>
+                <span className="font-semibold text-gray-500 uppercase tracking-wider text-[10px]">Selection AI:</span>
                 <PillButton onClick={() => handleAI('flashcards')}>Flashcard</PillButton>
                 <PillButton onClick={() => handleAI('summarize')}>Summary</PillButton>
-                <PillButton onClick={() => handleAI('quiz')}>Quiz</PillButton>
               </>
             )}
             {(aiLoading || aiState !== 'idle') && (
-              <span className={`chip ${aiState === 'success' || aiState === 'partial-success' ? 'chip-active' : ''}`}>
-                AI status: {aiLoading ? 'generating' : aiState.replace(/-/g, ' ')}
+              <span className={`px-2 py-1 rounded-full text-[10px] uppercase tracking-wider font-bold ${aiState === 'success' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
+                {aiLoading ? 'AI Generating...' : `AI: ${aiState.replace(/-/g, ' ')}`}
               </span>
             )}
           </div>
         )}
       </div>
 
-      <div className="px-6 pt-4 pb-2 border-b border-[var(--border)] bg-[var(--surface)] shrink-0">
+      <div className="px-8 pt-6 pb-4 bg-white shrink-0 shadow-sm z-0">
         {editingTitle ? (
-          <input
-            autoFocus
-            className="text-2xl font-semibold text-[var(--text-primary)] w-full outline-none border-b-2 border-[var(--primary-500)] pb-1 bg-transparent"
-            value={note.title}
-            onChange={(e) => updateNote(note.id, { title: e.target.value })}
-            onBlur={() => setEditingTitle(false)}
-            onKeyDown={(e) => e.key === 'Enter' && setEditingTitle(false)}
-          />
+          <input autoFocus className="text-3xl font-bold text-gray-900 w-full outline-none border-b-2 border-indigo-500 pb-1 bg-transparent" value={note.title} onChange={(e) => updateNote(note.id, { title: e.target.value })} onBlur={() => setEditingTitle(false)} onKeyDown={(e) => e.key === 'Enter' && setEditingTitle(false)} />
         ) : (
-          <h1
-            className="text-2xl font-semibold text-[var(--text-primary)] cursor-text hover:bg-[var(--surface-muted)] rounded px-1 -mx-1 py-0.5"
-            onClick={() => setEditingTitle(true)}
-          >
-            {note.title}
-          </h1>
+          <h1 className="text-3xl font-bold text-gray-900 cursor-text hover:bg-gray-50 rounded px-2 -mx-2 py-1 transition-colors" onClick={() => setEditingTitle(true)}>{note.title}</h1>
         )}
-        <div className="flex items-center gap-3 mt-1 flex-wrap">
-          <span className="text-xs text-[var(--text-muted)]">Updated {formatDate(note.updatedAt)}</span>
-          <span className="text-xs text-[var(--text-secondary)]">Docs {note.attachments.length}</span>
-          <span className="text-xs text-[var(--text-secondary)]">Drawings {note.drawings.length}</span>
-          {note.handwritingIndex && <span className="text-xs text-indigo-600">OCR indexed</span>}
-          <div className="flex gap-1 flex-wrap">
-            {note.tags.map((tag) => (
-              <span key={tag} className="text-xs bg-[var(--primary-100)] text-[var(--primary-600)] px-2 py-0.5 rounded-full">{tag}</span>
-            ))}
-          </div>
-          {note.linkedNoteIds.length > 0 && (
-            <span className="text-xs text-[var(--text-muted)]">🔗 {note.linkedNoteIds.length} linked</span>
-          )}
-        </div>
       </div>
 
-      {note.audioUrl && (
-        <div className="px-6 py-2 bg-[var(--surface-muted)] border-b border-[var(--border)] shrink-0">
-          <TimelineRail className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
-              <span className="h-2 w-2 rounded-full bg-[var(--danger-600)] animate-pulse" />
-              REC linked to note timeline
-            </div>
-            <span className="text-xs text-[var(--text-muted)]">{note.audioTimestamps.length} timestamp marker(s)</span>
-          </TimelineRail>
-        </div>
-      )}
-
-      <div className="flex-1 overflow-hidden px-3 py-3 relative min-h-0">
+      <div className="flex-1 overflow-hidden p-4 relative min-h-0 bg-gray-50">
         <SplitPane
-          leftClassName={`overflow-y-auto h-full rounded-2xl border border-[var(--border)] bg-white px-6 py-4 ${splitMode ? '' : 'col-span-2'}`}
-          rightClassName={splitMode ? 'overflow-y-auto h-full' : 'hidden'}
+          leftClassName={`overflow-y-auto h-full rounded-2xl ${splitMode ? '' : 'col-span-2'}`}
+          rightClassName={splitMode ? 'overflow-y-auto h-full pl-4' : 'hidden'}
           left={(
-            <>
+            <div className="flex flex-col gap-6 pb-20">
+              {/* THE CREATIVE EDITOR CANVAS */}
               <EditorContent editor={editor} className="h-full" />
+              
               {showSlashMenu && (
-                <div className="mt-2 w-52 rounded-xl border border-[var(--border)] bg-white shadow-lg p-1">
-                  <button onClick={() => insertSlashCommand('todo')} className="w-full text-left text-xs px-2 py-1.5 rounded hover:bg-[var(--surface-muted)]">/todo</button>
-                  <button onClick={() => insertSlashCommand('code')} className="w-full text-left text-xs px-2 py-1.5 rounded hover:bg-[var(--surface-muted)]">/code</button>
-                  <button onClick={() => insertSlashCommand('heading')} className="w-full text-left text-xs px-2 py-1.5 rounded hover:bg-[var(--surface-muted)]">/heading</button>
+                <div className="mt-2 w-52 rounded-xl border border-gray-200 bg-white shadow-xl p-1 z-50">
+                  <button onClick={() => insertSlashCommand('todo')} className="w-full text-left text-xs px-2 py-1.5 rounded hover:bg-gray-100">/todo</button>
+                  <button onClick={() => insertSlashCommand('code')} className="w-full text-left text-xs px-2 py-1.5 rounded hover:bg-gray-100">/code</button>
+                  <button onClick={() => insertSlashCommand('image')} className="w-full text-left text-xs px-2 py-1.5 rounded hover:bg-gray-100">/image (Paste URL)</button>
                 </div>
               )}
-              <NoteCanvasBoard note={note} />
-              <div className="mt-6">
+
+              {/* INTEGRATED DRAWING BOARD */}
+              <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+                <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-4 flex items-center gap-2"><Palette size={14}/> Infinite Canvas</h3>
+                <NoteCanvasBoard note={note} />
+              </div>
+
+              {/* INTEGRATED HANDWRITING PAD */}
+              <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+                <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-4 flex items-center gap-2"><Type size={14}/> Handwriting / OCR Pad</h3>
                 <HandwritingPad note={note} />
               </div>
-            </>
+            </div>
           )}
           right={splitMode ? <DocumentWorkspace note={note} compact /> : <></>}
         />
 
-        {/* BEAUTIFUL AI INSERT PANEL */}
+        {/* AI GENERATION PANEL OVERLAY */}
         {generatedAsset && (
-          <div className="absolute right-6 top-6 w-80 bg-white/90 backdrop-blur-md border border-[var(--border-strong)] shadow-2xl rounded-2xl p-5 flex flex-col z-50 overflow-hidden animate-in slide-in-from-right-8 duration-300">
+          <div className="absolute right-8 bottom-8 w-96 bg-white border border-gray-200 shadow-2xl rounded-2xl p-5 flex flex-col z-50 overflow-hidden animate-in slide-in-from-bottom-8 duration-300">
             <div className="flex justify-between items-center mb-3">
-              <h3 className="font-semibold text-sm flex items-center gap-1"><Sparkles size={14} className="text-purple-600"/> {generatedAsset.title}</h3>
-              <button onClick={() => setGeneratedAsset(null)} className="text-[var(--text-muted)] hover:bg-gray-200 p-1 rounded-md transition-colors">
-                <X size={14} />
-              </button>
+              <h3 className="font-semibold text-sm flex items-center gap-2"><Sparkles size={16} className="text-purple-600"/> {generatedAsset.title}</h3>
+              <button onClick={() => setGeneratedAsset(null)} className="text-gray-400 hover:bg-gray-100 p-1 rounded-md"><X size={14} /></button>
             </div>
             
-            <div className="bg-purple-50/50 rounded-lg p-3 mb-3 max-h-24 overflow-y-auto border border-purple-100">
-              <p className="text-[12px] text-purple-900 font-medium leading-snug italic">"{generatedAsset.prompt}"</p>
+            <div className="bg-purple-50 rounded-lg p-3 mb-4 max-h-24 overflow-y-auto border border-purple-100">
+              <p className="text-[12px] text-purple-900 font-medium leading-tight italic">"{generatedAsset.prompt}"</p>
             </div>
 
-            <div className="flex-1 min-h-[200px] bg-gray-100/80 rounded-xl flex items-center justify-center overflow-hidden mb-4 shadow-inner relative">
+            <div className="flex-1 min-h-[220px] bg-gray-50 rounded-xl flex items-center justify-center overflow-hidden mb-4 border border-gray-200 relative group">
               {generatedAsset.previewImage ? (
-                <img src={generatedAsset.previewImage} alt="Generated Preview" className="object-cover w-full h-full rounded-xl transition-transform hover:scale-105 duration-300" />
+                <img src={generatedAsset.previewImage} alt="Generated Preview" className="object-contain w-full h-full group-hover:scale-105 transition-transform duration-500" />
               ) : generatedAsset.assetUrl ? (
                 <div className="text-center p-4">
-                  <p className="text-sm font-bold mb-2">🧊 3D Model Ready</p>
-                  <a href={generatedAsset.assetUrl} target="_blank" rel="noreferrer" className="text-xs text-blue-600 font-medium px-3 py-1.5 bg-blue-50 rounded-full hover:bg-blue-100 transition-colors">Preview Asset</a>
+                  <p className="text-sm font-bold mb-2 text-gray-700">3D Model Ready 🧊</p>
+                  <a href={generatedAsset.assetUrl} target="_blank" rel="noreferrer" className="text-xs text-blue-600 hover:text-blue-800 underline bg-blue-50 px-3 py-1.5 rounded-full inline-block">Preview Asset</a>
                 </div>
               ) : (
-                <p className="text-xs text-gray-400 font-medium animate-pulse">Loading preview...</p>
+                <p className="text-xs text-gray-400 animate-pulse">Loading asset...</p>
               )}
             </div>
 
             <div className="flex gap-2 mt-auto">
-              <button 
-                onClick={() => setGeneratedAsset(null)} 
-                className="flex-1 py-2.5 rounded-xl text-xs font-semibold bg-gray-100 hover:bg-gray-200 text-gray-600 transition-all active:scale-95"
-              >
-                Discard
-              </button>
-              <button 
-                onClick={insertGeneratedAsset} 
-                className="flex-1 py-2.5 rounded-xl text-xs font-bold bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 shadow-md text-white transition-all active:scale-95 flex items-center justify-center gap-1"
-              >
-                <AlignLeft size={14} /> Insert Canvas
-              </button>
+              <button onClick={() => setGeneratedAsset(null)} className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors">Discard</button>
+              <button onClick={insertGeneratedAsset} className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-purple-600 hover:bg-purple-700 text-white transition-colors shadow-sm shadow-purple-200 flex items-center justify-center gap-1"><Image size={14} /> Insert to Note</button>
             </div>
           </div>
         )}
@@ -697,20 +465,9 @@ export function NoteEditor() {
   );
 }
 
-function ToolbarBtn({
-  onClick, active, title, children,
-}: {
-  onClick?: () => void;
-  active?: boolean;
-  title?: string;
-  children: React.ReactNode;
-}) {
+function ToolbarBtn({ onClick, active, title, children }: { onClick?: () => void; active?: boolean; title?: string; children: React.ReactNode; }) {
   return (
-    <button
-      onClick={onClick}
-      title={title}
-      className={`p-1.5 rounded hover:bg-[var(--surface-muted)] ${active ? 'bg-[var(--primary-100)] text-[var(--primary-600)]' : 'text-[var(--text-secondary)]'}`}
-    >
+    <button onClick={onClick} title={title} className={`p-1.5 rounded-md transition-colors ${active ? 'bg-indigo-100 text-indigo-700' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900'}`}>
       {children}
     </button>
   );
