@@ -25,6 +25,8 @@ import { FloatingToolbar, PillButton, SplitPane, TimelineRail } from '@/componen
 
 type AIAction = 'summarize' | 'flashcards' | 'quiz' | 'diagram' | 'image-convert' | '3d';
 type GenerationModel = 'black-forest-labs/flux.2-klein-4b' | 'microsoft/trellis';
+type SlashCommand = 'todo' | 'code' | 'heading';
+const SLASH_COMMAND_TODO_TEXT = '☐ To-do item';
 
 export function NoteEditor() {
   const {
@@ -99,10 +101,10 @@ export function NoteEditor() {
     return () => dom.removeEventListener('keydown', handler);
   }, [editor]);
 
-  const insertSlashCommand = (cmd: 'todo' | 'code' | 'heading') => {
+  const insertSlashCommand = (cmd: SlashCommand) => {
     if (!editor) return;
     if (cmd === 'todo') {
-      editor.chain().focus().insertContent('☐ To-do item').run();
+      editor.chain().focus().insertContent(SLASH_COMMAND_TODO_TEXT).run();
     } else if (cmd === 'code') {
       editor.chain().focus().toggleCodeBlock().run();
     } else {

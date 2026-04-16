@@ -1,6 +1,6 @@
 'use client';
 import React from 'react';
-import { useStore } from '@/store/useStore';
+import { NOTES_WIDTH_LIMITS, SIDEBAR_WIDTH_LIMITS, useStore } from '@/store/useStore';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { NotesList } from '@/components/notes/NotesList';
 import { NoteEditor } from '@/components/notes/NoteEditor';
@@ -20,6 +20,12 @@ import { SyncPanel } from '@/components/sync/SyncPanel';
 import { CommandPalette } from '@/components/search/CommandPalette';
 import { Toaster } from 'react-hot-toast';
 
+const getPanelStyles = (width: number, limits: { min: number; max: number }) => ({
+  width,
+  minWidth: limits.min,
+  maxWidth: limits.max,
+});
+
 export default function AppPage() {
   const {
     activeView,
@@ -35,9 +41,12 @@ export default function AppPage() {
     setActiveView,
   } = useStore();
   const [dragging, setDragging] = React.useState<'sidebar' | 'notes' | null>(null);
-
   const showNotesList = (activeView === 'notes' || activeView === 'note-editor' || activeView === 'documents') && notesListOpen && !editorFocusMode;
   const showSidebar = sidebarOpen && !editorFocusMode;
+  const getNotesPaneWidthFromClientX = React.useCallback(
+    (clientX: number) => clientX - (showSidebar ? layoutSidebarWidth : 0),
+    [layoutSidebarWidth, showSidebar]
+  );
 
   React.useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
@@ -61,7 +70,7 @@ export default function AppPage() {
     if (!dragging) return;
     const onMove = (e: MouseEvent) => {
       if (dragging === 'sidebar') setLayoutSidebarWidth(e.clientX);
-      if (dragging === 'notes') setLayoutNotesWidth(e.clientX - (showSidebar ? layoutSidebarWidth : 0));
+      if (dragging === 'notes') setLayoutNotesWidth(getNotesPaneWidthFromClientX(e.clientX));
     };
     const onUp = () => setDragging(null);
     window.addEventListener('mousemove', onMove);
@@ -70,7 +79,7 @@ export default function AppPage() {
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
     };
-  }, [dragging, setLayoutNotesWidth, setLayoutSidebarWidth, showSidebar, layoutSidebarWidth]);
+  }, [dragging, getNotesPaneWidthFromClientX, setLayoutNotesWidth, setLayoutSidebarWidth]);
 
   return (
     <div className="h-screen overflow-hidden app-bg flex flex-col">
@@ -80,7 +89,7 @@ export default function AppPage() {
       <div className="flex flex-1 overflow-hidden">
         {showSidebar && (
           <>
-            <div style={{ width: layoutSidebarWidth }} className="h-full min-w-[220px] max-w-[420px]">
+            <div style={getPanelStyles(layoutSidebarWidth, SIDEBAR_WIDTH_LIMITS)} className="h-full">
               <Sidebar />
             </div>
             <div className="w-1 cursor-col-resize bg-transparent hover:bg-indigo-200/60" onMouseDown={() => setDragging('sidebar')} />
@@ -89,7 +98,7 @@ export default function AppPage() {
 
         {showNotesList && (
           <>
-            <div style={{ width: layoutNotesWidth }} className="h-full min-w-[260px] max-w-[460px]">
+            <div style={getPanelStyles(layoutNotesWidth, NOTES_WIDTH_LIMITS)} className="h-full">
               <NotesList />
             </div>
             <div className="w-1 cursor-col-resize bg-transparent hover:bg-indigo-200/60" onMouseDown={() => setDragging('notes')} />

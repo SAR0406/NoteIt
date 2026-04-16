@@ -15,6 +15,9 @@ import { generateId, sm2 } from '@/lib/utils';
 import { TEMPLATES } from '@/lib/templates';
 import { sanitizeModelText } from '@/lib/ai/text';
 
+export const SIDEBAR_WIDTH_LIMITS = { min: 220, max: 420, default: 292 } as const;
+export const NOTES_WIDTH_LIMITS = { min: 260, max: 460, default: 320 } as const;
+
 interface Actions {
   // Navigation
   setActiveView: (view: AppView) => void;
@@ -259,8 +262,8 @@ const initialState: AppState = {
   selectedSystemSection: null,
   notesSort: 'recent',
   notesFilter: 'all',
-  layoutSidebarWidth: 292,
-  layoutNotesWidth: 320,
+  layoutSidebarWidth: SIDEBAR_WIDTH_LIMITS.default,
+  layoutNotesWidth: NOTES_WIDTH_LIMITS.default,
   syncStatus: 'synced',
   syncPanelOpen: false,
   commandPaletteOpen: false,
@@ -280,8 +283,12 @@ export const useStore = create<AppState & Actions>()(
       setSelectedSystemSection: (selectedSystemSection) => set({ selectedSystemSection }),
       setNotesSort: (notesSort) => set({ notesSort }),
       setNotesFilter: (notesFilter) => set({ notesFilter }),
-      setLayoutSidebarWidth: (width) => set({ layoutSidebarWidth: Math.min(420, Math.max(220, width)) }),
-      setLayoutNotesWidth: (width) => set({ layoutNotesWidth: Math.min(460, Math.max(260, width)) }),
+      setLayoutSidebarWidth: (width) => set({
+        layoutSidebarWidth: Math.min(SIDEBAR_WIDTH_LIMITS.max, Math.max(SIDEBAR_WIDTH_LIMITS.min, width)),
+      }),
+      setLayoutNotesWidth: (width) => set({
+        layoutNotesWidth: Math.min(NOTES_WIDTH_LIMITS.max, Math.max(NOTES_WIDTH_LIMITS.min, width)),
+      }),
       setSyncStatus: (syncStatus) => set({ syncStatus }),
       setSyncPanelOpen: (syncPanelOpen) => set({ syncPanelOpen }),
       setCommandPaletteOpen: (commandPaletteOpen) => set({ commandPaletteOpen }),

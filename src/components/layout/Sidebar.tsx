@@ -15,6 +15,7 @@ type MenuTarget =
   | { type: 'subject'; id: string }
   | { type: 'topic'; id: string }
   | null;
+type MoveDialogState = { type: 'subject' | 'topic'; id: string } | null;
 
 export function Sidebar() {
   const {
@@ -49,7 +50,7 @@ export function Sidebar() {
     selectedSystemSection,
   } = useStore();
 
-  const [expandedNbs, setExpandedNbs] = useState<Set<string>>(new Set(notebooks.map((n) => n.id)));
+  const [expandedNbs, setExpandedNbs] = useState<Set<string>>(() => new Set(notebooks.map((n) => n.id)));
   const [expandedSubs, setExpandedSubs] = useState<Set<string>>(new Set());
   const [addingNotebook, setAddingNotebook] = useState(false);
   const [newNbName, setNewNbName] = useState('');
@@ -59,6 +60,8 @@ export function Sidebar() {
   const [newTopicName, setNewTopicName] = useState('');
   const [menuTarget, setMenuTarget] = useState<MenuTarget>(null);
   const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null);
+  const [moveDialog, setMoveDialog] = useState<MoveDialogState>(null);
+  const [moveSelection, setMoveSelection] = useState('');
 
   const allTags = Array.from(new Set(notes.filter((n) => !n.isTrashed).flatMap((n) => n.tags))).sort();
   const dueCount = flashcards.filter((fc) => new Date(fc.dueDate) <= new Date()).length;
@@ -131,19 +134,35 @@ export function Sidebar() {
 
   const moveTarget = () => {
     if (!menuTarget) return;
-    if (menuTarget.type === 'subject') {
-      const options = notebooks.map((n) => `${n.id}: ${n.name}`).join('\n');
-      const target = window.prompt(`Move subject to notebook. Enter target notebook ID:\n${options}`);
-      if (target?.trim()) moveSubject(menuTarget.id, target.trim());
-    }
-    if (menuTarget.type === 'topic') {
-      const options = subjects.map((s) => `${s.id}: ${s.name}`).join('\n');
-      const target = window.prompt(`Move topic to subject. Enter target subject ID:\n${options}`);
-      if (target?.trim()) moveTopic(menuTarget.id, target.trim());
+    if (menuTarget.type === 'subject' || menuTarget.type === 'topic') {
+      setMoveDialog({ type: menuTarget.type, id: menuTarget.id });
+      setMoveSelection('');
     }
     setMenuTarget(null);
     setMenuPos(null);
   };
+
+  const executeMove = () => {
+    if (!moveDialog || !moveSelection) return;
+    if (moveDialog.type === 'subject') moveSubject(moveDialog.id, moveSelection);
+    if (moveDialog.type === 'topic') moveTopic(moveDialog.id, moveSelection);
+    setMoveDialog(null);
+    setMoveSelection('');
+  };
+
+  const moveOptions = (() => {
+    if (!moveDialog) return [];
+    if (moveDialog.type === 'subject') {
+      const targetSubject = subjects.find((sub) => sub.id === moveDialog.id);
+      return notebooks
+        .filter((nb) => nb.id !== targetSubject?.notebookId)
+        .map((nb) => ({ id: nb.id, label: nb.name }));
+    }
+    const targetTopic = topics.find((t) => t.id === moveDialog.id);
+    return subjects
+      .filter((sub) => sub.id !== targetTopic?.subjectId)
+      .map((sub) => ({ id: sub.id, label: sub.name }));
+  })();
 
   const deleteTarget = () => {
     if (!menuTarget) return;
@@ -385,6 +404,30 @@ export function Sidebar() {
             <button onClick={moveTarget} className="w-full text-left px-3 py-2 text-sm hover:bg-[var(--surface-muted)]">Move</button>
           )}
           <button onClick={deleteTarget} className="w-full text-left px-3 py-2 text-sm hover:bg-red-50 text-red-600">Delete</button>
+        </div>
+      )}
+
+      {moveDialog && (
+        <div className="fixed inset-0 z-[96] bg-slate-950/35 flex items-center justify-center p-4" onClick={() => setMoveDialog(null)}>
+          <div className="w-full max-w-sm rounded-xl border border-[var(--border)] bg-white shadow-xl p-4" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-2">
+              {moveDialog.type === 'subject' ? 'Move subject to notebook' : 'Move topic to subject'}
+            </h3>
+            <select
+              className="w-full rounded-lg border border-[var(--border)] px-2 py-2 text-sm text-[var(--text-primary)]"
+              value={moveSelection}
+              onChange={(e) => setMoveSelection(e.target.value)}
+            >
+              <option value="">Select destination…</option>
+              {moveOptions.map((option) => (
+                <option key={option.id} value={option.id}>{option.label}</option>
+              ))}
+            </select>
+            <div className="mt-3 flex justify-end gap-2">
+              <button onClick={() => setMoveDialog(null)} className="px-3 py-1.5 text-sm rounded-lg border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--surface-muted)]">Cancel</button>
+              <button onClick={executeMove} disabled={!moveSelection} className="px-3 py-1.5 text-sm rounded-lg bg-indigo-600 text-white disabled:opacity-50">Move</button>
+            </div>
+          </div>
         </div>
       )}
     </aside>
