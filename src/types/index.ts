@@ -78,6 +78,7 @@ export interface Note {
   handwritingIndex: string;
   isFavorite: boolean;
   isPinned: boolean;
+  isTrashed?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -117,8 +118,18 @@ export interface AppState {
   selectedTopicId: string | null;
   selectedNoteId: string | null;
   sidebarOpen: boolean;
+  notesListOpen: boolean;
   searchQuery: string;
   activeTag: string | null;
+  selectedSystemSection: 'all' | 'favorites' | 'trash' | null;
+  notesSort: 'recent' | 'title-asc';
+  notesFilter: 'all' | 'favorites' | 'pinned';
+  layoutSidebarWidth: number;
+  layoutNotesWidth: number;
+  syncStatus: 'synced' | 'syncing' | 'error';
+  syncPanelOpen: boolean;
+  commandPaletteOpen: boolean;
+  editorFocusMode: boolean;
 }
 
 export type AppView =

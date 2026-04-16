@@ -11,7 +11,7 @@ import { useStore } from '@/store/useStore';
 import {
   Bold, Italic, Underline as UnderlineIcon, Highlighter, List, ListOrdered,
   Heading1, Heading2, Heading3, Link as LinkIcon, Minus, Star, Pin, Tag,
-  Trash2, Brain, Sparkles, BookOpen, X, AlignLeft, Code, Quote, PanelRightOpen,
+  Trash2, Brain, Sparkles, BookOpen, X, AlignLeft, Code, Quote, PanelRightOpen, Focus,
 } from 'lucide-react';
 import { MEDICAL_TAGS } from '@/lib/templates';
 import { formatDate } from '@/lib/utils';
@@ -25,6 +25,8 @@ import { FloatingToolbar, PillButton, SplitPane, TimelineRail } from '@/componen
 
 type AIAction = 'summarize' | 'flashcards' | 'quiz' | 'diagram' | 'image-convert' | '3d';
 type GenerationModel = 'black-forest-labs/flux.2-klein-4b' | 'microsoft/trellis';
+type SlashCommand = 'todo' | 'code' | 'heading';
+const SLASH_COMMAND_TODO_TEXT = '☐ To-do item';
 
 export function NoteEditor() {
   const {
@@ -32,6 +34,7 @@ export function NoteEditor() {
     addTagToNote, removeTagFromNote, linkNotes, unlinkNote,
     generateFlashcardsFromNote, summarizeNote, generateQuizFromNote, addFlashcard,
     selectNote, addNote, selectedTopicId, selectedSubjectId, selectedNotebookId,
+    editorFocusMode, setEditorFocusMode,
   } = useStore();
 
   const note = notes.find((n) => n.id === selectedNoteId);
@@ -44,6 +47,7 @@ export function NoteEditor() {
   const [editingTitle, setEditingTitle] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
   const [splitMode, setSplitMode] = useState(false);
+  const [showSlashMenu, setShowSlashMenu] = useState(false);
   const [aiState, setAiState] = useState<'idle' | 'queued' | 'generating' | 'success' | 'partial-success' | 'retry' | 'fallback' | 'error'>('idle');
 
   const editor = useEditor(
@@ -80,6 +84,34 @@ export function NoteEditor() {
     if (!note?.id) return;
     setSplitMode(attachmentCount > 0);
   }, [attachmentCount, note?.id]);
+
+  React.useEffect(() => {
+    if (!editor) return;
+    const dom = editor.view.dom;
+    const handler = (event: KeyboardEvent) => {
+      if (event.key === '/') {
+        const { $from } = editor.state.selection;
+        const textBefore = $from.parent.textBetween(0, $from.parentOffset, undefined, '\ufffc');
+        const atCommandBoundary = textBefore.length === 0 || /\s$/.test(textBefore);
+        setShowSlashMenu(atCommandBoundary);
+      }
+      if (event.key === 'Escape') setShowSlashMenu(false);
+    };
+    dom.addEventListener('keydown', handler);
+    return () => dom.removeEventListener('keydown', handler);
+  }, [editor]);
+
+  const insertSlashCommand = (cmd: SlashCommand) => {
+    if (!editor) return;
+    if (cmd === 'todo') {
+      editor.chain().focus().insertContent(SLASH_COMMAND_TODO_TEXT).run();
+    } else if (cmd === 'code') {
+      editor.chain().focus().toggleCodeBlock().run();
+    } else {
+      editor.chain().focus().toggleHeading({ level: 2 }).run();
+    }
+    setShowSlashMenu(false);
+  };
 
   const applyLocalFallback = (action: 'summarize' | 'flashcards' | 'quiz') => {
     if (!note) return;
@@ -309,6 +341,13 @@ export function NoteEditor() {
             <PanelRightOpen size={15} />
           </button>
           <button
+            onClick={() => setEditorFocusMode(!editorFocusMode)}
+            className={`p-1.5 rounded hover:bg-[var(--surface-muted)] ${editorFocusMode ? 'text-indigo-600' : 'text-[var(--text-muted)]'}`}
+            title="Toggle focus mode"
+          >
+            <Focus size={15} />
+          </button>
+          <button
             onClick={() => toggleFavorite(note.id)}
             className={`p-1.5 rounded hover:bg-[var(--surface-muted)] ${note.isFavorite ? 'text-yellow-500' : 'text-[var(--text-muted)]'}`}
             title="Toggle favorite"
@@ -525,6 +564,13 @@ export function NoteEditor() {
           left={(
             <>
               <EditorContent editor={editor} />
+              {showSlashMenu && (
+                <div className="mt-2 w-52 rounded-xl border border-[var(--border)] bg-white shadow-lg p-1">
+                  <button onClick={() => insertSlashCommand('todo')} className="w-full text-left text-xs px-2 py-1.5 rounded hover:bg-[var(--surface-muted)]">/todo</button>
+                  <button onClick={() => insertSlashCommand('code')} className="w-full text-left text-xs px-2 py-1.5 rounded hover:bg-[var(--surface-muted)]">/code</button>
+                  <button onClick={() => insertSlashCommand('heading')} className="w-full text-left text-xs px-2 py-1.5 rounded hover:bg-[var(--surface-muted)]">/heading</button>
+                </div>
+              )}
               <NoteCanvasBoard note={note} />
               <div className="mt-6">
                 <HandwritingPad note={note} />

@@ -8,10 +8,10 @@ import { formatDate } from '@/lib/utils';
 export function SearchView() {
   const { notes, subjects, notebooks, topics, searchQuery, setSearchQuery, activeTag, setActiveTag, selectNote, setActiveView } = useStore();
 
-  const allTags = Array.from(new Set(notes.flatMap((n) => n.tags))).sort();
+  const allTags = Array.from(new Set(notes.filter((n) => !n.isTrashed).flatMap((n) => n.tags))).sort();
 
   const getFilteredNotes = (): Note[] => {
-    let filtered = notes;
+    let filtered = notes.filter((n) => !n.isTrashed);
     if (activeTag) {
       filtered = filtered.filter((n) => n.tags.includes(activeTag));
     }

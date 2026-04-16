@@ -16,9 +16,10 @@ export function HomeView() {
     notes, flashcards, notebooks, setActiveView, selectNote,
     addNote, selectedTopicId, selectedSubjectId, selectedNotebookId,
   } = useStore();
+  const activeNotes = notes.filter((n) => !n.isTrashed);
 
   const dueCards = flashcards.filter((fc) => isDue(fc.dueDate));
-  const recentNotes = [...notes].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()).slice(0, 6);
+  const recentNotes = [...activeNotes].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()).slice(0, 6);
   const latestNote = recentNotes[0];
 
   const weakTopics = (() => {
@@ -56,7 +57,7 @@ export function HomeView() {
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <span className="chip chip-active"><CalendarClock size={12} /> Anatomy exam in {countdownDays} days</span>
                 <span className="chip"><Target size={12} /> Revision pressure: {reviewPressure}</span>
-                <span className="chip"><Sparkles size={12} /> {notes.length} notes · {flashcards.length} cards · {notebooks.length} groups</span>
+                <span className="chip"><Sparkles size={12} /> {activeNotes.length} notes · {flashcards.length} cards · {notebooks.length} groups</span>
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -68,10 +69,10 @@ export function HomeView() {
         </div>
 
         <div className="grid gap-3 md:grid-cols-4">
-          <StatCard label="Total Notes" value={notes.length} icon={<BookOpen size={16} className="text-[var(--primary-600)]" />} />
+          <StatCard label="Total Notes" value={activeNotes.length} icon={<BookOpen size={16} className="text-[var(--primary-600)]" />} />
           <StatCard label="Cards Due Today" value={dueCards.length} icon={<Brain size={16} className="text-[var(--accent-600)]" />} />
-          <StatCard label="Study Streak Signal" value={`${Math.min(100, 60 + Math.round(notes.length / 2))}%`} icon={<Flame size={16} className="text-[var(--warning-600)]" />} />
-          <StatCard label="Knowledge Links" value={notes.filter((n) => n.linkedNoteIds.length > 0).length} icon={<BarChart3 size={16} className="text-[var(--success-600)]" />} />
+          <StatCard label="Study Streak Signal" value={`${Math.min(100, 60 + Math.round(activeNotes.length / 2))}%`} icon={<Flame size={16} className="text-[var(--warning-600)]" />} />
+          <StatCard label="Knowledge Links" value={activeNotes.filter((n) => n.linkedNoteIds.length > 0).length} icon={<BarChart3 size={16} className="text-[var(--success-600)]" />} />
         </div>
 
         <div className="grid gap-4 lg:grid-cols-2">
