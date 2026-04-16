@@ -248,7 +248,7 @@ export function NoteEditor() {
             <Minimize2 size={24} />
           </button>
         )}
-
+       </div> {/* ✅ CLOSE TOP NAVBAR DIV HERE */}
       <div className="flex-1 flex overflow-hidden relative">
         {/* 📜 MAIN INFINITE CANVAS SCROLL AREA */}
         <div className={`flex-1 overflow-y-auto relative scroll-smooth scrollbar-hide transition-all duration-700 ease-[cubic-bezier(0.23,1,0.32,1)] ${pageBg === 'blueprint' ? bgStyles.blueprint : bgStyles[pageBg]}`}>
