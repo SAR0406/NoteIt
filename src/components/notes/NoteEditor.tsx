@@ -28,6 +28,15 @@ type GenerationModel = 'black-forest-labs/flux.2-klein-4b' | 'microsoft/trellis'
 type SlashCommand = 'todo' | 'code' | 'heading';
 const SLASH_COMMAND_TODO_TEXT = '☐ To-do item';
 
+interface GeneratedAsset {
+  title: string;
+  model: string;
+  prompt: string;
+  previewImage?: string;
+  assetUrl?: string;
+  action: AIAction;
+}
+
 export function NoteEditor() {
   const {
     notes, selectedNoteId, updateNote, deleteNote, toggleFavorite, togglePin,
@@ -49,6 +58,7 @@ export function NoteEditor() {
   const [splitMode, setSplitMode] = useState(false);
   const [showSlashMenu, setShowSlashMenu] = useState(false);
   const [aiState, setAiState] = useState<'idle' | 'queued' | 'generating' | 'success' | 'partial-success' | 'retry' | 'fallback' | 'error'>('idle');
+  const [generatedAsset, setGeneratedAsset] = useState<GeneratedAsset | null>(null);
 
   const editor = useEditor(
     {
@@ -67,7 +77,8 @@ export function NoteEditor() {
       },
       editorProps: {
         attributes: {
-          class: 'prose prose-sm max-w-none focus:outline-none min-h-[420px] px-1',
+          // Changed layout classes here for proper scrolling mechanics
+          class: 'prose prose-sm max-w-none focus:outline-none min-h-full px-1 pb-20',
         },
       },
     },
@@ -120,20 +131,31 @@ export function NoteEditor() {
     else generateQuizFromNote(note.id);
   };
 
-  // UPDATED to be permissive of long Base64 strings
   const toSafeUrl = (value?: string) => {
     if (!value) return '';
-    // Strip all whitespaces/newlines which can corrupt base64 validation
-    const normalized = value.replace(/\s+/g, '');
-    if (
-      normalized.startsWith('https://') || 
-      normalized.startsWith('http://') || 
-      normalized.startsWith('data:image/') ||
-      normalized.startsWith('data:application/')
-    ) {
+    const normalized = value.trim();
+    if (normalized.startsWith('https://') || normalized.startsWith('http://') || normalized.startsWith('data:image/')) {
       return normalized;
     }
     return '';
+  };
+
+  const insertGeneratedAsset = () => {
+    if (!generatedAsset || !editor) return;
+    
+    const resultHtml = [
+      `<h3>${generatedAsset.title}</h3>`,
+      `<p><strong>Model:</strong> ${escapeHtml(generatedAsset.model)} | <strong>Prompt:</strong> ${escapeHtml(generatedAsset.prompt)}</p>`,
+      generatedAsset.previewImage ? `<p><img src="${escapeHtml(generatedAsset.previewImage)}" alt="Generated output" /></p>` : '',
+      generatedAsset.assetUrl && generatedAsset.assetUrl !== generatedAsset.previewImage 
+        ? `<p><a href="${escapeHtml(generatedAsset.assetUrl)}" target="_blank" rel="noreferrer">Open generated asset</a></p>` 
+        : '',
+    ].join('');
+
+    // Insert directly where the user's cursor is, rather than at the bottom
+    editor.chain().focus().insertContent(resultHtml).run();
+    setGeneratedAsset(null);
+    toast.success('Inserted into note!');
   };
 
   const handleAI = async (action: AIAction) => {
@@ -172,6 +194,7 @@ export function NoteEditor() {
 
     setAiLoading(true);
     setAiState('queued');
+    
     try {
       setAiState('generating');
       const response = await fetch('/api/ai', {
@@ -205,6 +228,7 @@ export function NoteEditor() {
           model?: string;
           previewImage?: string;
           assetUrl?: string;
+          raw?: any;
         } | null;
       };
 
@@ -215,6 +239,7 @@ export function NoteEditor() {
           setAiState('fallback');
           toast.success('Summary added (local fallback)');
         } else {
+          // Summary is still appended at the bottom safely
           const summaryHtml = `<h3>📝 AI Summary</h3><ul>${points.map((point) => `<li>${escapeHtml(point)}</li>`).join('')}</ul>`;
           updateNote(note.id, { content: `${note.content}<hr>${summaryHtml}` });
           setAiState('success');
@@ -235,12 +260,20 @@ export function NoteEditor() {
           toast.success(`NVIDIA NIM ${action === 'quiz' ? 'quiz cards' : 'flashcards'} generated (${cards.length})!`);
         }
       } else {
-        // Extract and validate the base64 or URL
-        const rawPreview = data.generated?.previewImage || '';
-        const rawAsset = data.generated?.assetUrl || '';
-        
-        const safePreview = toSafeUrl(rawPreview);
-        const safeAsset = toSafeUrl(rawAsset);
+        // Robust fallback extraction for Image/3D data
+        const rawObj = data.generated?.raw || {};
+        const rawB64 = rawObj.image || rawObj.b64_json || rawObj.data?.[0]?.b64_json || rawObj.artifacts?.[0]?.base64;
+        const rawUrl = rawObj.url || rawObj.asset_url || rawObj.data?.[0]?.url || rawObj.artifacts?.[0]?.url;
+
+        let safePreview = toSafeUrl(data.generated?.previewImage) || toSafeUrl(rawUrl);
+        let safeAsset = toSafeUrl(data.generated?.assetUrl) || toSafeUrl(rawUrl);
+
+        if (!safePreview && rawB64) {
+          safePreview = rawB64.startsWith('data:') ? rawB64 : `data:image/jpeg;base64,${rawB64}`;
+        }
+        if (!safeAsset && safePreview) {
+          safeAsset = safePreview;
+        }
 
         if (!safePreview && !safeAsset) {
           setAiState('fallback');
@@ -251,24 +284,22 @@ export function NoteEditor() {
             'image-convert': '🎨 AI Image Conversion',
             '3d': '🧊 AI 3D Generation',
           };
-          const title = titleByAction[action];
           
-          // DO NOT escapeHtml on safePreview, it destroys Base64 data strings!
-          const resultHtml = [
-            `<h3>${title}</h3>`,
-            `<p><strong>Model:</strong> ${escapeHtml(data.generated?.model ?? model)}</p>`,
-            `<p><strong>Prompt:</strong> ${escapeHtml(prompt)}</p>`,
-            safePreview ? `<p><img src="${safePreview}" alt="Generated output" style="max-width:100%; border-radius:8px;" /></p>` : '',
-            safeAsset && safeAsset !== safePreview ? `<p><a href="${escapeHtml(safeAsset)}" target="_blank" rel="noreferrer">Open generated asset</a></p>` : '',
-          ].join('');
-          
-          updateNote(note.id, { content: `${note.content}<hr>${resultHtml}` });
+          // Triggers the AI Side Panel instead of forcefully appending
+          setGeneratedAsset({
+            title: titleByAction[action],
+            model: data.generated?.model ?? model,
+            prompt,
+            previewImage: safePreview,
+            assetUrl: safeAsset,
+            action,
+          });
           setAiState('success');
-          toast.success(action === '3d' ? 'Trellis 3D generation added to note!' : 'FLUX generation result added to note!');
+          toast.success('Asset ready! Review in the AI panel.');
         }
       }
     } catch (e) {
-      console.error("Editor AI Generation Error:", e);
+      console.error("AI Generation Error:", e);
       if (action === 'summarize' || action === 'flashcards' || action === 'quiz') {
         applyLocalFallback(action);
         setAiState('fallback');
@@ -305,8 +336,8 @@ export function NoteEditor() {
   const hasSelection = editor ? !editor.state.selection.empty : false;
 
   return (
-    <div className="flex-1 flex flex-col bg-[var(--surface)] overflow-hidden">
-      <div className="border-b border-[var(--border)] bg-[var(--surface)] px-4 py-3 space-y-2">
+    <div className="flex-1 flex flex-col bg-[var(--surface)] overflow-hidden relative">
+      <div className="border-b border-[var(--border)] bg-[var(--surface)] px-4 py-3 space-y-2 shrink-0">
         <FloatingToolbar>
           <ToolbarBtn onClick={() => editor?.chain().focus().toggleBold().run()} active={editor?.isActive('bold')} title="Bold">
           <Bold size={15} />
@@ -527,7 +558,7 @@ export function NoteEditor() {
         )}
       </div>
 
-      <div className="px-6 pt-4 pb-2 border-b border-[var(--border)] bg-[var(--surface)]">
+      <div className="px-6 pt-4 pb-2 border-b border-[var(--border)] bg-[var(--surface)] shrink-0">
         {editingTitle ? (
           <input
             autoFocus
@@ -562,7 +593,7 @@ export function NoteEditor() {
       </div>
 
       {note.audioUrl && (
-        <div className="px-6 py-2 bg-[var(--surface-muted)] border-b border-[var(--border)]">
+        <div className="px-6 py-2 bg-[var(--surface-muted)] border-b border-[var(--border)] shrink-0">
           <TimelineRail className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
               <span className="h-2 w-2 rounded-full bg-[var(--danger-600)] animate-pulse" />
@@ -573,13 +604,13 @@ export function NoteEditor() {
         </div>
       )}
 
-      <div className="flex-1 overflow-hidden px-3 py-3">
+      <div className="flex-1 overflow-hidden px-3 py-3 relative min-h-0">
         <SplitPane
-          leftClassName={`overflow-y-auto rounded-2xl border border-[var(--border)] bg-white px-6 py-4 ${splitMode ? '' : 'col-span-2'}`}
-          rightClassName={splitMode ? 'min-h-0' : 'hidden'}
+          leftClassName={`overflow-y-auto h-full rounded-2xl border border-[var(--border)] bg-white px-6 py-4 ${splitMode ? '' : 'col-span-2'}`}
+          rightClassName={splitMode ? 'overflow-y-auto h-full' : 'hidden'}
           left={(
             <>
-              <EditorContent editor={editor} />
+              <EditorContent editor={editor} className="h-full" />
               {showSlashMenu && (
                 <div className="mt-2 w-52 rounded-xl border border-[var(--border)] bg-white shadow-lg p-1">
                   <button onClick={() => insertSlashCommand('todo')} className="w-full text-left text-xs px-2 py-1.5 rounded hover:bg-[var(--surface-muted)]">/todo</button>
@@ -595,6 +626,50 @@ export function NoteEditor() {
           )}
           right={splitMode ? <DocumentWorkspace note={note} compact /> : <></>}
         />
+
+        {/* AI GENERATION PANEL OVERLAY (Like MS Designer/Insert Panel) */}
+        {generatedAsset && (
+          <div className="absolute right-6 top-6 w-80 bg-white border border-[var(--border-strong)] shadow-2xl rounded-2xl p-5 flex flex-col z-50 overflow-hidden animate-in slide-in-from-right-8 duration-300">
+            <div className="flex justify-between items-center mb-3">
+              <h3 className="font-semibold text-sm flex items-center gap-1"><Sparkles size={14} className="text-purple-600"/> {generatedAsset.title}</h3>
+              <button onClick={() => setGeneratedAsset(null)} className="text-[var(--text-muted)] hover:bg-gray-100 p-1 rounded-md">
+                <X size={14} />
+              </button>
+            </div>
+            
+            <div className="bg-gray-50 rounded-lg p-2 mb-3 max-h-24 overflow-y-auto border border-gray-100">
+              <p className="text-[11px] text-gray-500 font-mono leading-tight">{generatedAsset.prompt}</p>
+            </div>
+
+            <div className="flex-1 min-h-[200px] bg-gray-100 rounded-xl flex items-center justify-center overflow-hidden mb-4 border border-gray-200 relative">
+              {generatedAsset.previewImage ? (
+                <img src={generatedAsset.previewImage} alt="Generated Preview" className="object-contain w-full h-full" />
+              ) : generatedAsset.assetUrl ? (
+                <div className="text-center p-4">
+                  <p className="text-sm font-medium mb-2">3D Model Ready</p>
+                  <a href={generatedAsset.assetUrl} target="_blank" rel="noreferrer" className="text-xs text-blue-600 underline">Preview Ext. Asset</a>
+                </div>
+              ) : (
+                <p className="text-xs text-gray-400">Loading preview...</p>
+              )}
+            </div>
+
+            <div className="flex gap-2 mt-auto">
+              <button 
+                onClick={() => setGeneratedAsset(null)} 
+                className="flex-1 py-2 rounded-lg text-xs font-medium bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors"
+              >
+                Discard
+              </button>
+              <button 
+                onClick={insertGeneratedAsset} 
+                className="flex-1 py-2 rounded-lg text-xs font-medium bg-purple-600 hover:bg-purple-700 text-white transition-colors flex items-center justify-center gap-1"
+              >
+                <AlignLeft size={12} /> Insert
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
