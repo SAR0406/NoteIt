@@ -165,6 +165,7 @@ export function NoteEditor() {
 
     setAiLoading(true);
     setAiState('queued');
+    
     try {
       setAiState('generating');
       const response = await fetch('/api/ai', {
@@ -224,16 +225,13 @@ export function NoteEditor() {
           toast.success(`${action === 'quiz' ? 'Quiz' : 'Flashcards'} generated (local fallback)`);
         } else {
           cards.forEach((card) => addFlashcard(card.front, card.back, note.id, note.tags));
-          
-          // Adjusted: Call it a full success as long as it generated cards (even if parallel fetched missed a few)
-          setAiState('success');
+          setAiState('success'); // Marked completely successful as long as we got at least 1 usable card!
           toast.success(`NVIDIA NIM ${action === 'quiz' ? 'quiz cards' : 'flashcards'} generated (${cards.length})!`);
         }
       } else {
         const safePreview = toSafeUrl(data.generated?.previewImage);
         const safeAsset = toSafeUrl(data.generated?.assetUrl);
-        
-        // Adjusted: Checking if AT LEAST ONE generated format was successfully returned.
+
         if (!safePreview && !safeAsset) {
           setAiState('fallback');
           toast.error('Generation completed but no preview URL was returned.');
@@ -243,13 +241,14 @@ export function NoteEditor() {
             'image-convert': '🎨 AI Image Conversion',
             '3d': '🧊 AI 3D Generation',
           };
+          
           const title = titleByAction[action];
           const resultHtml = [
             `<h3>${title}</h3>`,
             `<p><strong>Model:</strong> ${escapeHtml(data.generated?.model ?? model)}</p>`,
             `<p><strong>Prompt:</strong> ${escapeHtml(prompt)}</p>`,
             safePreview ? `<p><img src="${escapeHtml(safePreview)}" alt="Generated output" /></p>` : '',
-            safeAsset ? `<p><a href="${escapeHtml(safeAsset)}" target="_blank" rel="noreferrer">Open generated asset</a></p>` : '',
+            safeAsset && safeAsset !== safePreview ? `<p><a href="${escapeHtml(safeAsset)}" target="_blank" rel="noreferrer">Open generated asset</a></p>` : '',
           ].join('');
           
           updateNote(note.id, { content: `${note.content}<hr>${resultHtml}` });
@@ -257,14 +256,15 @@ export function NoteEditor() {
           toast.success(action === '3d' ? 'Trellis 3D generation added to note!' : 'FLUX generation result added to note!');
         }
       }
-    } catch {
+    } catch (e) {
+      console.error("AI Generation Error:", e);
       if (action === 'summarize' || action === 'flashcards' || action === 'quiz') {
         applyLocalFallback(action);
         setAiState('fallback');
         toast.success(`${action === 'quiz' ? 'Quiz' : action === 'summarize' ? 'Summary' : 'Flashcards'} generated (local fallback)`);
       } else {
         setAiState('retry');
-        toast.error('NVIDIA generation failed. Check API key and prompt/image input.');
+        toast.error('NVIDIA generation failed. Check console for details.');
       }
     }
     setAiLoading(false);
