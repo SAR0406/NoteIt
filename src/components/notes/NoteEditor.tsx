@@ -120,10 +120,17 @@ export function NoteEditor() {
     else generateQuizFromNote(note.id);
   };
 
+  // UPDATED to be permissive of long Base64 strings
   const toSafeUrl = (value?: string) => {
     if (!value) return '';
-    const normalized = value.trim();
-    if (normalized.startsWith('https://') || normalized.startsWith('http://') || normalized.startsWith('data:image/')) {
+    // Strip all whitespaces/newlines which can corrupt base64 validation
+    const normalized = value.replace(/\s+/g, '');
+    if (
+      normalized.startsWith('https://') || 
+      normalized.startsWith('http://') || 
+      normalized.startsWith('data:image/') ||
+      normalized.startsWith('data:application/')
+    ) {
       return normalized;
     }
     return '';
@@ -165,7 +172,6 @@ export function NoteEditor() {
 
     setAiLoading(true);
     setAiState('queued');
-    
     try {
       setAiState('generating');
       const response = await fetch('/api/ai', {
@@ -225,12 +231,16 @@ export function NoteEditor() {
           toast.success(`${action === 'quiz' ? 'Quiz' : 'Flashcards'} generated (local fallback)`);
         } else {
           cards.forEach((card) => addFlashcard(card.front, card.back, note.id, note.tags));
-          setAiState('success'); // Marked completely successful as long as we got at least 1 usable card!
+          setAiState('success');
           toast.success(`NVIDIA NIM ${action === 'quiz' ? 'quiz cards' : 'flashcards'} generated (${cards.length})!`);
         }
       } else {
-        const safePreview = toSafeUrl(data.generated?.previewImage);
-        const safeAsset = toSafeUrl(data.generated?.assetUrl);
+        // Extract and validate the base64 or URL
+        const rawPreview = data.generated?.previewImage || '';
+        const rawAsset = data.generated?.assetUrl || '';
+        
+        const safePreview = toSafeUrl(rawPreview);
+        const safeAsset = toSafeUrl(rawAsset);
 
         if (!safePreview && !safeAsset) {
           setAiState('fallback');
@@ -241,13 +251,14 @@ export function NoteEditor() {
             'image-convert': '🎨 AI Image Conversion',
             '3d': '🧊 AI 3D Generation',
           };
-          
           const title = titleByAction[action];
+          
+          // DO NOT escapeHtml on safePreview, it destroys Base64 data strings!
           const resultHtml = [
             `<h3>${title}</h3>`,
             `<p><strong>Model:</strong> ${escapeHtml(data.generated?.model ?? model)}</p>`,
             `<p><strong>Prompt:</strong> ${escapeHtml(prompt)}</p>`,
-            safePreview ? `<p><img src="${escapeHtml(safePreview)}" alt="Generated output" /></p>` : '',
+            safePreview ? `<p><img src="${safePreview}" alt="Generated output" style="max-width:100%; border-radius:8px;" /></p>` : '',
             safeAsset && safeAsset !== safePreview ? `<p><a href="${escapeHtml(safeAsset)}" target="_blank" rel="noreferrer">Open generated asset</a></p>` : '',
           ].join('');
           
@@ -257,7 +268,7 @@ export function NoteEditor() {
         }
       }
     } catch (e) {
-      console.error("AI Generation Error:", e);
+      console.error("Editor AI Generation Error:", e);
       if (action === 'summarize' || action === 'flashcards' || action === 'quiz') {
         applyLocalFallback(action);
         setAiState('fallback');
