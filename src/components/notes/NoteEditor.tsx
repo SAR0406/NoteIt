@@ -738,7 +738,7 @@ export function NoteEditor() {
       <div className="flex-1 flex overflow-hidden">
         <div
           className={`flex-1 overflow-y-auto relative scroll-smooth scrollbar-hide`}
-          style={{ ...bgPatternClass, backgroundColor: activeTheme === 'blueprint' ? '#0f172a' : undefined }}
+          style={{ ...bgPatternClass }}
         >
 
           {/* Cover image */}
