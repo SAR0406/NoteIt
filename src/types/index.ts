@@ -30,6 +30,20 @@ export interface CanvasSticker {
   createdAt: string;
 }
 
+export interface CanvasNode {
+  id: string;
+  title: string;
+  body: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  color: string;
+  connections: string[];
+  icon?: string;
+  energy?: number;
+}
+
 export interface Notebook {
   id: string;
   name: string;
@@ -75,6 +89,7 @@ export interface Note {
   attachments: NoteAttachment[];
   drawings: DrawingLayer[];
   canvasStickers: CanvasSticker[];
+  canvasNodes: CanvasNode[];
   handwritingIndex: string;
   isFavorite: boolean;
   isPinned: boolean;

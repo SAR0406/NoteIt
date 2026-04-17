@@ -8,6 +8,7 @@ import {
   Subject,
   Topic,
   Note,
+  CanvasNode,
   Flashcard,
   FlashcardDifficulty,
 } from '@/types';
@@ -83,6 +84,10 @@ interface Actions {
   updateAttachmentAnnotation: (noteId: string, attachmentId: string, annotationLayerDataUrl: string | null) => void;
   addDrawingToNote: (noteId: string, drawing: { name: string; dataUrl: string; indexedText?: string }) => void;
   removeDrawingFromNote: (noteId: string, drawingId: string) => void;
+  addCanvasNode: (noteId: string, node: CanvasNode) => void;
+  updateCanvasNode: (noteId: string, nodeId: string, patch: Partial<CanvasNode>) => void;
+  removeCanvasNode: (noteId: string, nodeId: string) => void;
+  linkCanvasNodes: (noteId: string, sourceId: string, targetId: string) => void;
   setHandwritingIndex: (noteId: string, handwritingIndex: string) => void;
 
   // Flashcards
@@ -180,6 +185,47 @@ const initialState: AppState = {
       attachments: [],
       drawings: [],
       canvasStickers: [],
+      canvasNodes: [
+        {
+          id: 'cn-brachial-map',
+          title: 'Neurovascular map',
+          body: 'Roots → Trunks → Divisions → Cords → Terminal branches',
+          x: 120,
+          y: 80,
+          width: 260,
+          height: 150,
+          color: '#4f46e5',
+          connections: ['cn-sensory', 'cn-clinical'],
+          icon: '🧠',
+          energy: 0.9,
+        },
+        {
+          id: 'cn-sensory',
+          title: 'Dermatomes',
+          body: 'C5 shoulder · C6 thumb · C7 middle · C8 little · T1 medial forearm',
+          x: 420,
+          y: 110,
+          width: 280,
+          height: 160,
+          color: '#06b6d4',
+          connections: ['cn-brachial-map'],
+          icon: '🩻',
+          energy: 0.72,
+        },
+        {
+          id: 'cn-clinical',
+          title: 'Lesion patterns',
+          body: 'Erb palsy (C5-C6) vs Klumpke palsy (C8-T1) · Radial nerve drop · Ulnar claw',
+          x: 260,
+          y: 320,
+          width: 300,
+          height: 170,
+          color: '#f59e0b',
+          connections: ['cn-brachial-map'],
+          icon: '🩺',
+          energy: 0.84,
+        },
+      ],
       handwritingIndex: '',
       isFavorite: true,
       isPinned: true,
@@ -202,6 +248,47 @@ const initialState: AppState = {
       attachments: [],
       drawings: [],
       canvasStickers: [],
+      canvasNodes: [
+        {
+          id: 'cn-pharma-mech',
+          title: 'Mechanism',
+          body: 'Non-selective adrenergic agonist · α1 α2 β1 β2',
+          x: 140,
+          y: 90,
+          width: 240,
+          height: 140,
+          color: '#8b5cf6',
+          connections: ['cn-pharma-effects', 'cn-pharma-dosing'],
+          icon: '⚙️',
+          energy: 0.78,
+        },
+        {
+          id: 'cn-pharma-effects',
+          title: 'Physiology',
+          body: '↑ HR (β1) · ↑ SBP (α1) · ↓ DBP (β2) · Bronchodilation (β2)',
+          x: 420,
+          y: 120,
+          width: 280,
+          height: 150,
+          color: '#06b6d4',
+          connections: ['cn-pharma-mech'],
+          icon: '📈',
+          energy: 0.7,
+        },
+        {
+          id: 'cn-pharma-dosing',
+          title: 'Clinical pearls',
+          body: 'Anaphylaxis IM 0.3–0.5 mg · ACLS 1 mg IV q3–5 min · Monitor K+ ↓',
+          x: 260,
+          y: 320,
+          width: 280,
+          height: 160,
+          color: '#f97316',
+          connections: ['cn-pharma-mech'],
+          icon: '💉',
+          energy: 0.82,
+        },
+      ],
       handwritingIndex: '',
       isFavorite: false,
       isPinned: false,
@@ -511,6 +598,7 @@ export const useStore = create<AppState & Actions>()(
           attachments: [],
           drawings: [],
           canvasStickers: [],
+          canvasNodes: [],
           handwritingIndex: '',
           isFavorite: false,
           isPinned: false,
@@ -678,6 +766,65 @@ export const useStore = create<AppState & Actions>()(
               : n
           ),
         })),
+      addCanvasNode: (noteId, node) =>
+        set((s) => ({
+          notes: s.notes.map((n) =>
+            n.id === noteId
+              ? {
+                  ...n,
+                  canvasNodes: [
+                    ...(n.canvasNodes ?? []),
+                    { ...node, id: node.id || generateId(), connections: node.connections ?? [] },
+                  ],
+                  updatedAt: new Date().toISOString(),
+                }
+              : n
+          ),
+        })),
+      updateCanvasNode: (noteId, nodeId, patch) =>
+        set((s) => ({
+          notes: s.notes.map((n) =>
+            n.id === noteId
+              ? {
+                  ...n,
+                  canvasNodes: (n.canvasNodes ?? []).map((cn) =>
+                    cn.id === nodeId ? { ...cn, ...patch } : cn
+                  ),
+                  updatedAt: new Date().toISOString(),
+                }
+              : n
+          ),
+        })),
+      removeCanvasNode: (noteId, nodeId) =>
+        set((s) => ({
+          notes: s.notes.map((n) =>
+            n.id === noteId
+              ? {
+                  ...n,
+                  canvasNodes: (n.canvasNodes ?? [])
+                    .filter((cn) => cn.id !== nodeId)
+                    .map((cn) => ({ ...cn, connections: cn.connections.filter((c) => c !== nodeId) })),
+                  updatedAt: new Date().toISOString(),
+                }
+              : n
+          ),
+        })),
+      linkCanvasNodes: (noteId, sourceId, targetId) =>
+        set((s) => ({
+          notes: s.notes.map((n) => {
+            if (n.id !== noteId || sourceId === targetId) return n;
+            const nextNodes = (n.canvasNodes ?? []).map((cn) => {
+              if (cn.id === sourceId && !cn.connections.includes(targetId)) {
+                return { ...cn, connections: [...cn.connections, targetId] };
+              }
+              if (cn.id === targetId && !cn.connections.includes(sourceId)) {
+                return { ...cn, connections: [...cn.connections, sourceId] };
+              }
+              return cn;
+            });
+            return { ...n, canvasNodes: nextNodes, updatedAt: new Date().toISOString() };
+          }),
+        })),
       setHandwritingIndex: (noteId, handwritingIndex) =>
         set((s) => ({
           notes: s.notes.map((n) =>
@@ -772,6 +919,8 @@ export const useStore = create<AppState & Actions>()(
               ...n,
               attachments: n.attachments ?? [],
               drawings: n.drawings ?? [],
+              canvasStickers: n.canvasStickers ?? [],
+              canvasNodes: n.canvasNodes ?? [],
               handwritingIndex: n.handwritingIndex ?? '',
               isTrashed: n.isTrashed ?? false,
             })),
