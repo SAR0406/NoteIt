@@ -647,7 +647,7 @@ export function NoteEditor() {
   const activeTabCfg = TAB_CONFIG.find(t => t.id === activeTab)!;
 
   return (
-    <div className={`flex-1 flex flex-col overflow-hidden relative transition-colors duration-700 ${THEMES[activeTheme]} ${activeTheme === 'blueprint' ? 'bg-[#0f172a]' : ''}`}>
+    <div className={`flex-1 flex flex-col overflow-hidden relative transition-colors duration-700 ${THEMES[activeTheme]}`}>
 
       {/* ── Ambient glows ── */}
       <div className="fixed top-0 left-1/4 w-[800px] h-[800px] rounded-full blur-[180px] pointer-events-none mix-blend-screen opacity-40 animate-pulse"
