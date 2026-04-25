@@ -20,12 +20,14 @@ import {
   Sparkles, X, AlignLeft, LayoutGrid, FileText, Clock, Hash, Maximize2, ImagePlus,
   Settings2, Undo2, Redo2, Maximize, Orbit, Shapes, Wand2, Layers, MousePointer2,
   PenTool, Eraser, Minimize2, Image as ImageIcon, Type, Palette, Brain, Upload,
-  Cpu, Zap, ScanLine, ChevronRight, Box, Loader2, GripHorizontal,
+  Cpu, Zap, ScanLine, ChevronRight, Box, Loader2, GripHorizontal, Pen,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { DocumentWorkspace } from '@/components/documents/DocumentWorkspace';
 import { HandwritingPad } from './HandwritingPad';
 import { NoteCanvasBoard } from './NoteCanvasBoard';
+import { Floating3DModelViewer } from './Floating3DModelViewer';
+import { AnnotationOverlay } from './AnnotationOverlay';
 import { AI_FLASHCARD_CARD_LIMIT, AI_SUMMARY_POINT_LIMIT } from '@/lib/ai/constants';
 import { escapeHtml } from '@/lib/ai/text';
 
@@ -83,21 +85,25 @@ function ResizableImageNodeView({ node, updateAttributes, selected }: any) {
   const [width, setWidth] = useState<number | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const startRef = useRef<{ x: number; w: number } | null>(null);
+  // Touch detection — lazy initial state so it's computed once on mount (client only)
+  const [isTouch] = useState<boolean>(
+    () => typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches,
+  );
 
   useEffect(() => {
-    if (containerRef.current) {
-      const w = node.attrs.width;
-      if (typeof w === 'number') setWidth(w);
-    }
+    const w = node.attrs.width;
+    if (typeof w === 'number') setWidth(w);
   }, [node.attrs.width]);
 
-  const startResize = useCallback((e: React.MouseEvent, dir: 'left' | 'right') => {
+  // ── Pointer-event resize (works for mouse AND touch / Apple Pencil) ──────
+  const startResize = useCallback((e: React.PointerEvent, dir: 'left' | 'right') => {
     e.preventDefault();
     e.stopPropagation();
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     const currentW = containerRef.current?.offsetWidth ?? 400;
     startRef.current = { x: e.clientX, w: currentW };
 
-    const onMove = (mv: MouseEvent) => {
+    const onMove = (mv: PointerEvent) => {
       if (!startRef.current || !containerRef.current) return;
       const delta = mv.clientX - startRef.current.x;
       const newW = Math.max(80, startRef.current.w + (dir === 'right' ? delta : -delta));
@@ -107,13 +113,20 @@ function ResizableImageNodeView({ node, updateAttributes, selected }: any) {
     const onUp = () => {
       if (containerRef.current) updateAttributes({ width: containerRef.current.offsetWidth });
       startRef.current = null;
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
     };
 
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
+    window.addEventListener('pointermove', onMove, { passive: true });
+    window.addEventListener('pointerup', onUp);
   }, [updateAttributes]);
+
+  // handle visibility: always show on touch, hover on desktop
+  const handleClass = `absolute z-20 flex items-center justify-center
+    bg-white/90 backdrop-blur-md border border-white/40 shadow-xl cursor-ew-resize
+    transition-opacity duration-200
+    ${isTouch ? 'opacity-100' : 'opacity-0 group-hover/img:opacity-100'}
+    top-1/2 -translate-y-1/2 w-7 h-14 rounded-full touch-none`;
 
   return (
     <NodeViewWrapper as="div" className="relative inline-block my-8 group/img" style={{ width: width ? `${width}px` : node.attrs.width ?? '100%' }}>
@@ -132,29 +145,29 @@ function ResizableImageNodeView({ node, updateAttributes, selected }: any) {
 
         {/* Resize handle — LEFT */}
         <div
-          onMouseDown={(e) => startResize(e, 'left')}
-          className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1/2 w-5 h-12 rounded-full bg-white/90 backdrop-blur-md border border-white/40 shadow-xl cursor-ew-resize z-20 opacity-0 group-hover/img:opacity-100 transition-opacity duration-200 flex items-center justify-center"
+          onPointerDown={(e) => startResize(e, 'left')}
+          className={`${handleClass} left-0 -translate-x-1/2`}
         >
           <GripHorizontal size={12} className="text-gray-500 rotate-90" />
         </div>
 
         {/* Resize handle — RIGHT */}
         <div
-          onMouseDown={(e) => startResize(e, 'right')}
-          className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 w-5 h-12 rounded-full bg-white/90 backdrop-blur-md border border-white/40 shadow-xl cursor-ew-resize z-20 opacity-0 group-hover/img:opacity-100 transition-opacity duration-200 flex items-center justify-center"
+          onPointerDown={(e) => startResize(e, 'right')}
+          className={`${handleClass} right-0 translate-x-1/2`}
         >
           <GripHorizontal size={12} className="text-gray-500 rotate-90" />
         </div>
 
         {/* Corner resize handle — bottom right */}
         <div
-          onMouseDown={(e) => startResize(e, 'right')}
-          className="absolute -bottom-2 -right-2 w-5 h-5 rounded-full bg-indigo-500 border-2 border-white shadow-lg cursor-nwse-resize z-20 opacity-0 group-hover/img:opacity-100 transition-opacity duration-200"
+          onPointerDown={(e) => startResize(e, 'right')}
+          className={`absolute -bottom-2 -right-2 w-7 h-7 rounded-full bg-indigo-500 border-2 border-white shadow-lg cursor-nwse-resize z-20 transition-opacity duration-200 touch-none ${isTouch ? 'opacity-100' : 'opacity-0 group-hover/img:opacity-100'}`}
         />
 
         {/* Width badge */}
         {selected && width && (
-          <div className="absolute -top-8 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-black/80 backdrop-blur-md text-white text-xs font-mono font-bold border border-white/10 shadow-xl">
+          <div className="absolute -top-8 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-black/80 backdrop-blur-md text-white text-xs font-mono font-bold border border-white/10 shadow-xl pointer-events-none">
             {width}px
           </div>
         )}
@@ -191,7 +204,200 @@ const ResizableImageExtension = Node.create({
   },
 });
 
-// ─── AI Prompt Modal ──────────────────────────────────────────────────────────
+// ─── ResizableModel TipTap Extension ─────────────────────────────────────────
+function ResizableModelNodeView({ node, updateAttributes, selected }: any) {
+  const [width, setWidth] = useState<number | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const startRef = useRef<{ x: number; w: number } | null>(null);
+  const rafRef = useRef<number>(0);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  // Touch detection — lazy initial state so it's computed once on mount (client only)
+  const [isTouch] = useState<boolean>(
+    () => typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches,
+  );
+
+  useEffect(() => {
+    const w = node.attrs.width;
+    if (typeof w === 'number') setWidth(w);
+  }, [node.attrs.width]);
+
+  // Rotating‑cube animation inside the node
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    let angle = 0;
+    const verts: [number, number, number][] = [
+      [-1,-1,-1],[1,-1,-1],[1,1,-1],[-1,1,-1],
+      [-1,-1, 1],[1,-1, 1],[1,1, 1],[-1,1, 1],
+    ];
+    const edges: [number, number][] = [
+      [0,1],[1,2],[2,3],[3,0],
+      [4,5],[5,6],[6,7],[7,4],
+      [0,4],[1,5],[2,6],[3,7],
+    ];
+
+    const proj = (x: number, y: number, z: number): [number, number] => {
+      const s = 5 / (5 + z);
+      return [canvas.width / 2 + x * s * 50, canvas.height / 2 + y * s * 50];
+    };
+    const rot = (x: number, y: number, z: number, ax: number, ay: number): [number, number, number] => {
+      const cy = Math.cos(ay); const sy = Math.sin(ay);
+      const x1 = x * cy - z * sy;  const z1 = x * sy + z * cy;
+      const cx = Math.cos(ax); const sx = Math.sin(ax);
+      return [x1, y * cx - z1 * sx, y * sx + z1 * cx];
+    };
+
+    const frame = () => {
+      angle += 0.01;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const p = verts.map(([x, y, z]) => proj(...rot(x, y, z, angle * 0.6, angle)));
+      ctx.strokeStyle = 'rgba(139,92,246,0.9)';
+      ctx.shadowColor = '#8b5cf6';
+      ctx.shadowBlur  = 10;
+      ctx.lineWidth   = 1.5;
+      for (const [a, b] of edges) {
+        ctx.beginPath();
+        ctx.moveTo(p[a][0], p[a][1]);
+        ctx.lineTo(p[b][0], p[b][1]);
+        ctx.stroke();
+      }
+      ctx.fillStyle = '#c084fc';
+      ctx.shadowBlur = 14;
+      for (const [px, py] of p) {
+        ctx.beginPath();
+        ctx.arc(px, py, 2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      rafRef.current = requestAnimationFrame(frame);
+    };
+
+    rafRef.current = requestAnimationFrame(frame);
+    return () => cancelAnimationFrame(rafRef.current);
+  }, []);
+
+  // Pointer resize
+  const startResize = useCallback((e: React.PointerEvent, dir: 'left' | 'right') => {
+    e.preventDefault();
+    e.stopPropagation();
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    const currentW = containerRef.current?.offsetWidth ?? 400;
+    startRef.current = { x: e.clientX, w: currentW };
+
+    const onMove = (mv: PointerEvent) => {
+      if (!startRef.current) return;
+      const delta = mv.clientX - startRef.current.x;
+      setWidth(Math.max(180, startRef.current.w + (dir === 'right' ? delta : -delta)));
+    };
+    const onUp = () => {
+      if (containerRef.current) updateAttributes({ width: containerRef.current.offsetWidth });
+      startRef.current = null;
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup',   onUp);
+    };
+    window.addEventListener('pointermove', onMove, { passive: true });
+    window.addEventListener('pointerup',   onUp);
+  }, [updateAttributes]);
+
+  const handleClass = `absolute z-20 flex items-center justify-center bg-purple-500/80 backdrop-blur-md border border-purple-300/40 shadow-xl cursor-ew-resize transition-opacity duration-200 top-1/2 -translate-y-1/2 w-7 h-14 rounded-full touch-none ${isTouch ? 'opacity-100' : 'opacity-0 group-hover/model:opacity-100'}`;
+
+  const src = node.attrs.src as string;
+  const isGlb = /\.(glb|gltf)(\?|$)/i.test(src);
+
+  return (
+    <NodeViewWrapper as="div" className="relative inline-block my-8 group/model" style={{ width: width ? `${width}px` : node.attrs.width ?? '100%' }}>
+      <div ref={containerRef} className="relative">
+        <div className={`relative w-full rounded-3xl overflow-hidden border border-purple-500/20 shadow-[0_24px_60px_rgba(139,92,246,0.3)] bg-black/70 flex flex-col items-center justify-center ${selected ? 'ring-2 ring-purple-500 ring-offset-2 ring-offset-transparent' : ''}`}
+          style={{ minHeight: 220 }}>
+
+          {isGlb ? (
+            /* model-viewer web component */
+            /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+            React.createElement('model-viewer' as any, {
+              src,
+              'auto-rotate': true,
+              'camera-controls': true,
+              'shadow-intensity': '1',
+              style: { width: '100%', height: 260 },
+            })
+          ) : (
+            <canvas ref={canvasRef} width={300} height={180} className="opacity-90 w-full" />
+          )}
+
+          {/* Label */}
+          <div className="absolute top-3 left-3 px-3 py-1 rounded-full bg-purple-500/80 backdrop-blur-md text-white text-xs font-bold">
+            🧊 3D Model
+          </div>
+
+          {/* Download */}
+          <a
+            href={src}
+            download
+            target="_blank"
+            rel="noopener noreferrer"
+            className="absolute bottom-3 right-3 px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-white text-xs font-bold backdrop-blur-md transition-all hover:scale-105"
+            onClick={(e) => e.stopPropagation()}
+          >
+            ↓ Download
+          </a>
+
+          {node.attrs.prompt && (
+            <p className="absolute bottom-3 left-3 text-[11px] text-purple-200/70 font-medium max-w-[60%] truncate">
+              {node.attrs.prompt}
+            </p>
+          )}
+        </div>
+
+        {selected && <div className="absolute inset-0 rounded-3xl border-2 border-purple-500/80 pointer-events-none" />}
+
+        <div onPointerDown={(e) => startResize(e, 'left')} className={`${handleClass} left-0 -translate-x-1/2`}>
+          <GripHorizontal size={12} className="text-white rotate-90" />
+        </div>
+        <div onPointerDown={(e) => startResize(e, 'right')} className={`${handleClass} right-0 translate-x-1/2`}>
+          <GripHorizontal size={12} className="text-white rotate-90" />
+        </div>
+        <div
+          onPointerDown={(e) => startResize(e, 'right')}
+          className={`absolute -bottom-2 -right-2 w-7 h-7 rounded-full bg-purple-500 border-2 border-white shadow-lg cursor-nwse-resize z-20 transition-opacity duration-200 touch-none ${isTouch ? 'opacity-100' : 'opacity-0 group-hover/model:opacity-100'}`}
+        />
+        {selected && width && (
+          <div className="absolute -top-8 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-black/80 backdrop-blur-md text-white text-xs font-mono font-bold border border-white/10 shadow-xl pointer-events-none">
+            {width}px
+          </div>
+        )}
+      </div>
+    </NodeViewWrapper>
+  );
+}
+
+const ResizableModelExtension = Node.create({
+  name: 'resizableModel',
+  group: 'block',
+  atom: true,
+  draggable: true,
+
+  addAttributes() {
+    return {
+      src:    { default: null },
+      prompt: { default: '' },
+      width:  { default: '100%' },
+    };
+  },
+
+  parseHTML() {
+    return [{ tag: 'div[data-model-src]' }];
+  },
+
+  renderHTML({ HTMLAttributes }) {
+    return ['div', mergeAttributes({ 'data-model-src': HTMLAttributes.src }, HTMLAttributes)];
+  },
+
+  addNodeView() {
+    return ReactNodeViewRenderer(ResizableModelNodeView);
+  },
+});
 interface AiModalProps {
   open: boolean;
   onClose: () => void;
@@ -470,6 +676,8 @@ export function NoteEditor() {
   const [generatedAsset, setGeneratedAsset]   = useState<any>(null);
   const [focusMode, setFocusMode]             = useState(false);
   const [tabEntering, setTabEntering]         = useState(false);
+  const [showAnnotation, setShowAnnotation]   = useState(false);
+  const [floating3D, setFloating3D]           = useState<{ assetUrl: string; prompt: string } | null>(null);
 
   // ── Canvas State ──
   const [pageBg, setPageBg]           = useState<PageBackground>('dots');
@@ -500,6 +708,7 @@ export function NoteEditor() {
       Highlight.configure({ multicolor: true }),
       Underline, TextStyle, Color,
       ResizableImageExtension,
+      ResizableModelExtension,
       Link.configure({
         openOnClick: false,
         HTMLAttributes: { class: 'text-indigo-400 hover:text-indigo-300 font-semibold underline decoration-indigo-500/30 underline-offset-4 transition-colors' },
@@ -531,6 +740,15 @@ export function NoteEditor() {
     editor.chain().focus().insertContent({
       type: 'resizableImage',
       attrs: { src, width: '100%' },
+    }).run();
+  }, [editor]);
+
+  // ── 3D model insertion ──
+  const insertModel = useCallback((src: string, prompt: string) => {
+    if (!editor) return;
+    editor.chain().focus().insertContent({
+      type: 'resizableModel',
+      attrs: { src, prompt, width: '100%' },
     }).run();
   }, [editor]);
 
@@ -585,7 +803,13 @@ export function NoteEditor() {
   const insertGeneratedAsset = () => {
     if (!generatedAsset || !editor) return;
     const isImg = generatedAsset.assetUrl.startsWith('data:image') || /\.(jpeg|jpg|gif|png|webp)$/i.test(generatedAsset.assetUrl);
-    if (isImg) {
+    const is3D  = generatedAsset.action === '3d';
+
+    if (is3D) {
+      // Open as floating viewer AND embed a model node
+      setFloating3D({ assetUrl: generatedAsset.assetUrl, prompt: generatedAsset.prompt });
+      insertModel(generatedAsset.assetUrl, generatedAsset.prompt);
+    } else if (isImg) {
       insertImage(generatedAsset.assetUrl);
     } else {
       const html = `<p><a href="${escapeHtml(generatedAsset.assetUrl)}" target="_blank" style="color:#6366f1;font-weight:bold">🧊 View 3D Asset: ${escapeHtml(generatedAsset.prompt)}</a></p>`;
@@ -1005,6 +1229,15 @@ export function NoteEditor() {
               />
             </div>
 
+            {/* Annotate Button */}
+            <ToolbarBtn
+              onClick={() => setShowAnnotation(true)}
+              active={showAnnotation}
+              isDark={isDark}
+            >
+              <Pen size={20} className="text-pink-400" />
+            </ToolbarBtn>
+
             {/* AI Button */}
             <div className="ml-2">
               <button
@@ -1053,6 +1286,28 @@ export function NoteEditor() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* ── ANNOTATION OVERLAY ── */}
+      {showAnnotation && (
+        <AnnotationOverlay
+          isDark={isDark}
+          onClose={() => setShowAnnotation(false)}
+          onSave={(dataUrl) => {
+            insertImage(dataUrl);
+            toast.success('Annotation embedded into note.');
+          }}
+        />
+      )}
+
+      {/* ── FLOATING 3D MODEL VIEWER ── */}
+      {floating3D && (
+        <Floating3DModelViewer
+          assetUrl={floating3D.assetUrl}
+          prompt={floating3D.prompt}
+          isDark={isDark}
+          onClose={() => setFloating3D(null)}
+        />
       )}
 
       <style>{`
