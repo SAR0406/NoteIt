@@ -18,9 +18,9 @@ import { useStore } from '@/store/useStore';
 import {
   Bold, Italic, Underline as UnderlineIcon, Highlighter, List, Heading1, Heading2,
   Sparkles, X, AlignLeft, LayoutGrid, FileText, Clock, Hash, Maximize2, ImagePlus,
-  Settings2, Undo2, Redo2, Maximize, Orbit, Shapes, Wand2, Layers, MousePointer2,
+  Settings2, Undo2, Redo2, Maximize, Shapes, Wand2, Layers, MousePointer2,
   PenTool, Eraser, Minimize2, Image as ImageIcon, Type, Palette, Brain, Upload,
-  Cpu, Zap, ScanLine, ChevronRight, Box, Loader2, GripHorizontal,
+  Cpu, Zap, ScanLine, ChevronRight, Box, Loader2, GripHorizontal, Pencil,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { DocumentWorkspace } from '@/components/documents/DocumentWorkspace';
@@ -28,6 +28,8 @@ import { HandwritingPad } from './HandwritingPad';
 import { NoteCanvasBoard } from './NoteCanvasBoard';
 import { AI_FLASHCARD_CARD_LIMIT, AI_SUMMARY_POINT_LIMIT } from '@/lib/ai/constants';
 import { escapeHtml } from '@/lib/ai/text';
+import { Model3DViewer } from '@/components/ui/Model3DViewer';
+import { AnnotateOverlay } from '@/components/ui/AnnotateOverlay';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type EditorTab = 'write' | 'canvas' | 'ocr';
@@ -83,6 +85,8 @@ function ResizableImageNodeView({ node, updateAttributes, selected }: any) {
   const [width, setWidth] = useState<number | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const startRef = useRef<{ x: number; w: number } | null>(null);
+  // Track touch vs pointer for compatibility
+  const activePointerId = useRef<number | null>(null);
 
   useEffect(() => {
     if (containerRef.current) {
@@ -91,7 +95,34 @@ function ResizableImageNodeView({ node, updateAttributes, selected }: any) {
     }
   }, [node.attrs.width]);
 
-  const startResize = useCallback((e: React.MouseEvent, dir: 'left' | 'right') => {
+  // ── Unified pointer-event resize (mouse + touch + Apple Pencil) ──
+  const startResize = useCallback((e: React.PointerEvent, dir: 'left' | 'right') => {
+    e.preventDefault();
+    e.stopPropagation();
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    activePointerId.current = e.pointerId;
+    const currentW = containerRef.current?.offsetWidth ?? 400;
+    startRef.current = { x: e.clientX, w: currentW };
+  }, []);
+
+  const onResizeMove = useCallback((e: React.PointerEvent, dir: 'left' | 'right') => {
+    if (!startRef.current || activePointerId.current === null) return;
+    const delta = e.clientX - startRef.current.x;
+    const newW = Math.max(80, startRef.current.w + (dir === 'right' ? delta : -delta));
+    setWidth(newW);
+  }, []);
+
+  const endResize = useCallback((_e: React.PointerEvent) => {
+    if (containerRef.current && startRef.current) {
+      updateAttributes({ width: containerRef.current.offsetWidth });
+    }
+    startRef.current = null;
+    activePointerId.current = null;
+  }, [updateAttributes]);
+
+  // ── Legacy mouse-only resize (kept for environments without pointer events) ──
+  const startResizeMouse = useCallback((e: React.MouseEvent, dir: 'left' | 'right') => {
+    if (window.PointerEvent) return; // prefer pointer events
     e.preventDefault();
     e.stopPropagation();
     const currentW = containerRef.current?.offsetWidth ?? 400;
@@ -116,40 +147,64 @@ function ResizableImageNodeView({ node, updateAttributes, selected }: any) {
   }, [updateAttributes]);
 
   return (
-    <NodeViewWrapper as="div" className="relative inline-block my-8 group/img" style={{ width: width ? `${width}px` : node.attrs.width ?? '100%' }}>
+    <NodeViewWrapper
+      as="div"
+      className="relative my-4 sm:my-8 group/img"
+      style={{
+        width: width ? `${width}px` : node.attrs.width ?? '100%',
+        maxWidth: '100%', // always stay within the editor on mobile
+        touchAction: 'pan-y', // allow vertical scroll but intercept horizontal for resize
+      }}
+    >
       <div ref={containerRef} className="relative">
         <img
           src={node.attrs.src}
           alt={node.attrs.alt || ''}
-          className={`w-full block rounded-3xl transition-all duration-300 shadow-[0_24px_60px_rgba(0,0,0,0.25)] ${selected ? 'ring-2 ring-indigo-500 ring-offset-2 ring-offset-transparent' : ''}`}
+          className={`w-full block rounded-2xl sm:rounded-3xl transition-all duration-300 shadow-[0_12px_30px_rgba(0,0,0,0.2)] sm:shadow-[0_24px_60px_rgba(0,0,0,0.25)] ${selected ? 'ring-2 ring-indigo-500 ring-offset-2 ring-offset-transparent' : ''}`}
           draggable={false}
+          style={{ maxWidth: '100%', height: 'auto' }}
         />
 
         {/* Selection overlay */}
         {selected && (
-          <div className="absolute inset-0 rounded-3xl border-2 border-indigo-500/80 pointer-events-none" />
+          <div className="absolute inset-0 rounded-2xl sm:rounded-3xl border-2 border-indigo-500/80 pointer-events-none" />
         )}
 
         {/* Resize handle — LEFT */}
         <div
-          onMouseDown={(e) => startResize(e, 'left')}
-          className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1/2 w-5 h-12 rounded-full bg-white/90 backdrop-blur-md border border-white/40 shadow-xl cursor-ew-resize z-20 opacity-0 group-hover/img:opacity-100 transition-opacity duration-200 flex items-center justify-center"
+          onPointerDown={(e) => startResize(e, 'left')}
+          onPointerMove={(e) => onResizeMove(e, 'left')}
+          onPointerUp={endResize}
+          onPointerCancel={endResize}
+          onMouseDown={(e) => startResizeMouse(e, 'left')}
+          style={{ touchAction: 'none' }}
+          className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1/2 w-5 h-12 sm:w-5 sm:h-12 rounded-full bg-white/90 backdrop-blur-md border border-white/40 shadow-xl cursor-ew-resize z-20 opacity-0 group-hover/img:opacity-100 transition-opacity duration-200 flex items-center justify-center"
         >
           <GripHorizontal size={12} className="text-gray-500 rotate-90" />
         </div>
 
         {/* Resize handle — RIGHT */}
         <div
-          onMouseDown={(e) => startResize(e, 'right')}
-          className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 w-5 h-12 rounded-full bg-white/90 backdrop-blur-md border border-white/40 shadow-xl cursor-ew-resize z-20 opacity-0 group-hover/img:opacity-100 transition-opacity duration-200 flex items-center justify-center"
+          onPointerDown={(e) => startResize(e, 'right')}
+          onPointerMove={(e) => onResizeMove(e, 'right')}
+          onPointerUp={endResize}
+          onPointerCancel={endResize}
+          onMouseDown={(e) => startResizeMouse(e, 'right')}
+          style={{ touchAction: 'none' }}
+          className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 w-5 h-12 sm:w-5 sm:h-12 rounded-full bg-white/90 backdrop-blur-md border border-white/40 shadow-xl cursor-ew-resize z-20 opacity-0 group-hover/img:opacity-100 transition-opacity duration-200 flex items-center justify-center"
         >
           <GripHorizontal size={12} className="text-gray-500 rotate-90" />
         </div>
 
-        {/* Corner resize handle — bottom right */}
+        {/* Corner resize handle — bottom right (larger touch target on mobile) */}
         <div
-          onMouseDown={(e) => startResize(e, 'right')}
-          className="absolute -bottom-2 -right-2 w-5 h-5 rounded-full bg-indigo-500 border-2 border-white shadow-lg cursor-nwse-resize z-20 opacity-0 group-hover/img:opacity-100 transition-opacity duration-200"
+          onPointerDown={(e) => startResize(e, 'right')}
+          onPointerMove={(e) => onResizeMove(e, 'right')}
+          onPointerUp={endResize}
+          onPointerCancel={endResize}
+          onMouseDown={(e) => startResizeMouse(e, 'right')}
+          style={{ touchAction: 'none' }}
+          className="absolute -bottom-3 -right-3 w-7 h-7 sm:w-5 sm:h-5 rounded-full bg-indigo-500 border-2 border-white shadow-lg cursor-nwse-resize z-20 opacity-0 group-hover/img:opacity-100 transition-opacity duration-200"
         />
 
         {/* Width badge */}
@@ -208,7 +263,7 @@ function AiPromptModal({ open, onClose, onSubmit, generating, isDark }: AiModalP
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[500] flex items-center justify-center p-6">
+    <div className="fixed inset-0 z-[500] flex items-end sm:items-center justify-center p-0 sm:p-6">
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/60 backdrop-blur-2xl"
@@ -220,48 +275,50 @@ function AiPromptModal({ open, onClose, onSubmit, generating, isDark }: AiModalP
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-1/4 left-1/3 w-96 h-96 bg-violet-500/30 rounded-full blur-[120px] animate-pulse" style={{ animationDuration: '6s' }} />
         <div className="absolute bottom-1/4 right-1/3 w-80 h-80 bg-pink-500/25 rounded-full blur-[100px] animate-pulse" style={{ animationDuration: '8s', animationDelay: '2s' }} />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-cyan-500/20 rounded-full blur-[80px] animate-pulse" style={{ animationDuration: '10s', animationDelay: '4s' }} />
       </div>
 
-      {/* Modal */}
+      {/* Modal — bottom sheet on mobile, centered on desktop */}
       <div
-        className={`relative z-10 w-full max-w-2xl rounded-[48px] border shadow-[0_80px_160px_-40px_rgba(0,0,0,0.8)] overflow-hidden`}
+        className={`relative z-10 w-full max-w-2xl rounded-t-[36px] sm:rounded-[48px] border shadow-[0_80px_160px_-40px_rgba(0,0,0,0.8)] overflow-hidden`}
         style={{ animation: 'scaleIn 0.4s cubic-bezier(0.23,1,0.32,1)' }}
       >
         {/* Glass surface */}
         <div className={`absolute inset-0 ${isDark ? 'bg-[#0f0f14]/85' : 'bg-white/85'} backdrop-blur-[80px]`} />
-        <div className={`absolute inset-0 border rounded-[48px] ${isDark ? 'border-white/8' : 'border-black/8'}`} />
+        <div className={`absolute inset-0 border rounded-t-[36px] sm:rounded-[48px] ${isDark ? 'border-white/8' : 'border-black/8'}`} />
 
         {/* Top gradient stripe */}
         <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-violet-500 via-pink-500 to-cyan-500" />
 
-        <div className="relative z-10 p-10">
+        {/* Mobile drag indicator */}
+        <div className="sm:hidden absolute top-3 left-1/2 -translate-x-1/2 w-10 h-1 bg-white/20 rounded-full" />
+
+        <div className="relative z-10 p-6 sm:p-10">
           {/* Header */}
-          <div className="flex items-center justify-between mb-8">
-            <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-[20px] bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-2xl shadow-purple-500/40">
-                <Wand2 size={24} className="text-white" />
+          <div className="flex items-center justify-between mb-6 sm:mb-8">
+            <div className="flex items-center gap-3 sm:gap-4">
+              <div className="w-11 h-11 sm:w-14 sm:h-14 rounded-[18px] sm:rounded-[20px] bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-2xl shadow-purple-500/40">
+                <Wand2 size={20} className="text-white" />
               </div>
               <div>
-                <h2 className={`text-2xl font-black tracking-tight ${isDark ? 'text-white' : 'text-gray-900'}`}>Neural Operations</h2>
-                <p className={`text-sm font-semibold ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Choose your synthesis mode</p>
+                <h2 className={`text-lg sm:text-2xl font-black tracking-tight ${isDark ? 'text-white' : 'text-gray-900'}`}>Neural Operations</h2>
+                <p className={`text-xs sm:text-sm font-semibold ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Choose your synthesis mode</p>
               </div>
             </div>
             <button
               onClick={onClose}
-              className={`p-3 rounded-2xl transition-all hover:scale-110 ${isDark ? 'bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white' : 'bg-black/5 hover:bg-black/10 text-gray-500'}`}
+              className={`p-2.5 sm:p-3 rounded-2xl transition-all hover:scale-110 ${isDark ? 'bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white' : 'bg-black/5 hover:bg-black/10 text-gray-500'}`}
             >
-              <X size={20} />
+              <X size={18} />
             </button>
           </div>
 
           {/* Operation cards */}
-          <div className="grid grid-cols-2 gap-3 mb-8">
+          <div className="grid grid-cols-2 gap-2 sm:gap-3 mb-6 sm:mb-8">
             {AI_OPERATIONS.map((op) => (
               <button
                 key={op.action}
                 onClick={() => setSelected(op.action)}
-                className={`group relative p-5 rounded-[28px] text-left transition-all duration-300 overflow-hidden ${
+                className={`group relative p-4 sm:p-5 rounded-[24px] sm:rounded-[28px] text-left transition-all duration-300 overflow-hidden ${
                   selected === op.action
                     ? 'scale-[0.97]'
                     : 'hover:-translate-y-1'
@@ -325,16 +382,16 @@ function AiPromptModal({ open, onClose, onSubmit, generating, isDark }: AiModalP
           <button
             onClick={() => { onSubmit(selected, needsPrompt ? prompt : ''); }}
             disabled={generating || (needsPrompt && !prompt.trim())}
-            className={`w-full py-5 rounded-[28px] font-black text-base text-white flex items-center justify-center gap-3 transition-all duration-500 ${
+            className={`w-full py-4 sm:py-5 rounded-[24px] sm:rounded-[28px] font-black text-sm sm:text-base text-white flex items-center justify-center gap-3 transition-all duration-500 ${
               generating || (needsPrompt && !prompt.trim())
                 ? 'opacity-40 cursor-not-allowed bg-gray-500'
                 : 'bg-gradient-to-r from-violet-500 via-purple-500 to-pink-500 hover:from-violet-600 hover:via-purple-600 hover:to-pink-600 hover:-translate-y-1 shadow-2xl shadow-purple-500/30 hover:shadow-purple-500/50'
             }`}
           >
             {generating ? (
-              <><Loader2 size={20} className="animate-spin" /> Neural link active...</>
+              <><Loader2 size={18} className="animate-spin" /> Neural link active...</>
             ) : (
-              <><Zap size={20} className="group-hover:animate-bounce" /> Activate {AI_OPERATIONS.find(o => o.action === selected)?.label}</>
+              <><Zap size={18} /> Activate {AI_OPERATIONS.find(o => o.action === selected)?.label}</>
             )}
           </button>
         </div>
@@ -405,20 +462,22 @@ interface TabBarProps {
 
 function TabBar({ activeTab, onChange, isDark }: TabBarProps) {
   const activeIdx = TAB_CONFIG.findIndex(t => t.id === activeTab);
+  // On small screens, use simpler tab style (no sliding pill, just active highlight)
+  const TAB_W_DESKTOP = 156;
+  const TAB_W_MOBILE = 100;
 
   return (
-    <div className={`relative flex items-center gap-1 p-1.5 rounded-[28px] border w-fit ${
+    <div className={`relative flex items-center gap-1 p-1.5 rounded-[28px] border w-fit max-w-full ${
       isDark ? 'bg-white/[0.04] border-white/8' : 'bg-black/[0.03] border-black/8'
     }`}>
-      {/* Sliding pill */}
+      {/* Sliding pill — hidden on mobile to keep width compact */}
       <div
-        className={`absolute top-1.5 bottom-1.5 rounded-[22px] transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${
+        className={`hidden sm:block absolute top-1.5 bottom-1.5 rounded-[22px] transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${
           TAB_CONFIG[activeIdx].glow
         } bg-gradient-to-r ${TAB_CONFIG[activeIdx].gradient} shadow-lg`}
         style={{
-          // Approximate pill width per tab: each tab ~160px, gap 4px, left padding 6px
-          left: `${6 + activeIdx * 164}px`,
-          width: '156px',
+          left: `${6 + activeIdx * (TAB_W_DESKTOP + 4)}px`,
+          width: `${TAB_W_DESKTOP}px`,
         }}
       />
 
@@ -428,19 +487,22 @@ function TabBar({ activeTab, onChange, isDark }: TabBarProps) {
           <button
             key={tab.id}
             onClick={() => onChange(tab.id)}
-            className={`relative z-10 flex items-center gap-2.5 px-5 py-3 rounded-[22px] transition-all duration-300 w-[156px] justify-center font-bold text-sm ${
+            className={`relative z-10 flex items-center gap-1.5 sm:gap-2.5 px-3 sm:px-5 py-2.5 sm:py-3 rounded-[22px] transition-all duration-300 justify-center font-bold text-xs sm:text-sm ${
               isActive
-                ? 'text-white'
+                ? `text-white ${!isDark ? '' : ''} sm:bg-transparent bg-gradient-to-r ${tab.gradient}`
                 : isDark
                   ? 'text-gray-400 hover:text-white'
                   : 'text-gray-500 hover:text-gray-800'
             }`}
+            style={{ width: `${TAB_W_MOBILE}px` }}
+            // Override width on desktop via media query via style prop isn't possible,
+            // so we use a data attribute and rely on the actual button sizing
           >
             <tab.icon
-              size={16}
+              size={14}
               className={`transition-transform duration-300 ${isActive ? 'scale-110' : ''}`}
             />
-            <span className="tracking-tight">{tab.label}</span>
+            <span className="tracking-tight truncate">{tab.label}</span>
           </button>
         );
       })}
@@ -470,6 +532,11 @@ export function NoteEditor() {
   const [generatedAsset, setGeneratedAsset]   = useState<any>(null);
   const [focusMode, setFocusMode]             = useState(false);
   const [tabEntering, setTabEntering]         = useState(false);
+
+  // ── New: 3D floating viewer + annotation ──
+  const [floating3D, setFloating3D]           = useState<{ src: string; title: string } | null>(null);
+  const [showAnnotate, setShowAnnotate]       = useState(false);
+  const editorAreaRef = useRef<HTMLDivElement>(null);
 
   // ── Canvas State ──
   const [pageBg, setPageBg]           = useState<PageBackground>('dots');
@@ -511,7 +578,7 @@ export function NoteEditor() {
     },
     editorProps: {
       attributes: {
-        class: `prose prose-xl max-w-none focus:outline-none min-h-[60vh] pb-64 pt-6 leading-[1.85] selection:bg-indigo-500/30 selection:text-indigo-200 ${
+        class: `prose prose-base sm:prose-xl max-w-none focus:outline-none min-h-[60vh] pb-32 sm:pb-64 pt-4 sm:pt-6 leading-[1.85] selection:bg-indigo-500/30 selection:text-indigo-200 ${
           isDark ? 'prose-invert prose-headings:text-white prose-p:text-gray-200 prose-li:text-gray-200' : ''
         }`,
       },
@@ -573,7 +640,14 @@ export function NoteEditor() {
         const rawUrl = data.generated?.assetUrl || data.generated?.previewImage || data.generated?.raw?.url;
         let src = rawUrl?.replace(/\s+/g, '') || '';
         if (src && !src.startsWith('http') && !src.startsWith('data:')) src = `data:image/jpeg;base64,${src}`;
-        if (src) setGeneratedAsset({ title: action === '3d' ? '🧊 3D Asset' : '🖼️ Neural Render', prompt, assetUrl: src, action });
+        if (src) {
+          const asset = { title: action === '3d' ? '🧊 3D Asset' : '🖼️ Neural Render', prompt, assetUrl: src, action };
+          setGeneratedAsset(asset);
+          // For 3D assets, also open the floating 3D viewer immediately
+          if (action === '3d') {
+            setFloating3D({ src, title: `🧊 ${prompt || '3D Model'}` });
+          }
+        }
       }
     } catch {
       toast.error('Neural pathway disrupted.');
@@ -657,41 +731,41 @@ export function NoteEditor() {
 
       {/* ── TOP NAVBAR ── */}
       {!focusMode && (
-        <div className={`h-16 border-b flex items-center px-6 justify-between shrink-0 z-40 sticky top-0 backdrop-blur-3xl transition-all ${
+        <div className={`h-12 sm:h-16 border-b flex items-center px-3 sm:px-6 justify-between shrink-0 z-40 sticky top-0 backdrop-blur-3xl transition-all ${
           isDark ? 'border-white/[0.06] bg-black/20' : 'border-black/[0.06] bg-white/20'
         }`}>
-          <div className={`flex items-center gap-5 text-sm font-bold ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
-            <span className="flex items-center gap-2"><Clock size={14} className="text-indigo-400" />{readingTime}m read</span>
-            <span className="flex items-center gap-2"><Hash size={14} className="text-emerald-400" />{wordCount} words</span>
+          <div className={`flex items-center gap-2 sm:gap-5 text-xs sm:text-sm font-bold ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+            <span className="flex items-center gap-1.5"><Clock size={13} className="text-indigo-400" />{readingTime}m</span>
+            <span className="flex items-center gap-1.5"><Hash size={13} className="text-emerald-400" />{wordCount}</span>
             {aiGenerating && (
-              <span className="flex items-center gap-2 text-purple-400 bg-purple-500/10 px-3 py-1 rounded-full border border-purple-500/20 text-xs">
-                <Loader2 size={12} className="animate-spin" /> Neural link active
+              <span className="flex items-center gap-1.5 text-purple-400 bg-purple-500/10 px-2 sm:px-3 py-1 rounded-full border border-purple-500/20 text-xs">
+                <Loader2 size={11} className="animate-spin" /> <span className="hidden sm:inline">Neural link active</span><span className="sm:hidden">AI…</span>
               </span>
             )}
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2">
             {/* Focus mode */}
             <button onClick={() => setFocusMode(true)}
-              className={`p-2.5 rounded-xl border transition-all hover:scale-105 backdrop-blur-md ${isDark ? 'bg-white/[0.04] border-white/8 text-gray-400 hover:text-white' : 'bg-black/[0.04] border-black/8 text-gray-500 hover:text-black'}`}>
-              <Maximize size={16} />
+              className={`p-2 sm:p-2.5 rounded-xl border transition-all hover:scale-105 backdrop-blur-md ${isDark ? 'bg-white/[0.04] border-white/8 text-gray-400 hover:text-white' : 'bg-black/[0.04] border-black/8 text-gray-500 hover:text-black'}`}>
+              <Maximize size={14} />
             </button>
 
-            {/* Split */}
+            {/* Split — hidden on mobile */}
             <button onClick={() => setSplitMode(!splitMode)}
-              className={`p-2.5 rounded-xl border transition-all hover:scale-105 backdrop-blur-md ${splitMode ? 'bg-indigo-500 text-white border-transparent shadow-lg shadow-indigo-500/30' : isDark ? 'bg-white/[0.04] border-white/8 text-gray-400 hover:text-white' : 'bg-black/[0.04] border-black/8 text-gray-500 hover:text-black'}`}>
-              <LayoutGrid size={16} />
+              className={`hidden lg:flex p-2 sm:p-2.5 rounded-xl border transition-all hover:scale-105 backdrop-blur-md ${splitMode ? 'bg-indigo-500 text-white border-transparent shadow-lg shadow-indigo-500/30' : isDark ? 'bg-white/[0.04] border-white/8 text-gray-400 hover:text-white' : 'bg-black/[0.04] border-black/8 text-gray-500 hover:text-black'}`}>
+              <LayoutGrid size={14} />
             </button>
 
             {/* Settings */}
             <div className="relative">
               <button onClick={() => setShowSettings(!showSettings)}
-                className={`p-2.5 rounded-xl border transition-all hover:scale-105 backdrop-blur-md ${isDark ? 'bg-white/[0.04] border-white/8 text-gray-400 hover:text-white' : 'bg-black/[0.04] border-black/8 text-gray-500 hover:text-black'}`}>
-                <Settings2 size={16} />
+                className={`p-2 sm:p-2.5 rounded-xl border transition-all hover:scale-105 backdrop-blur-md ${isDark ? 'bg-white/[0.04] border-white/8 text-gray-400 hover:text-white' : 'bg-black/[0.04] border-black/8 text-gray-500 hover:text-black'}`}>
+                <Settings2 size={14} />
               </button>
 
               {showSettings && (
-                <div className={`absolute right-0 top-full mt-3 w-80 rounded-[32px] border shadow-[0_40px_80px_rgba(0,0,0,0.4)] p-6 z-50 backdrop-blur-[60px] ${isDark ? 'bg-[#111]/90 border-white/8' : 'bg-white/90 border-black/8'}`}
+                <div className={`absolute right-0 top-full mt-3 w-72 sm:w-80 rounded-[28px] sm:rounded-[32px] border shadow-[0_40px_80px_rgba(0,0,0,0.4)] p-5 sm:p-6 z-50 backdrop-blur-[60px] ${isDark ? 'bg-[#111]/90 border-white/8' : 'bg-white/90 border-black/8'}`}
                   style={{ animation: 'scaleIn 0.25s cubic-bezier(0.23,1,0.32,1)' }}>
                   <p className="text-[10px] font-black tracking-[0.25em] uppercase text-gray-500 mb-4">Canvas Pattern</p>
                   <div className="grid grid-cols-5 gap-2 mb-6">
@@ -729,14 +803,15 @@ export function NoteEditor() {
       {/* Focus mode exit */}
       {focusMode && (
         <button onClick={() => setFocusMode(false)}
-          className="fixed top-8 right-8 z-[200] p-4 bg-white/10 backdrop-blur-2xl border border-white/20 text-white rounded-full hover:bg-white/20 hover:scale-110 transition-all shadow-2xl">
-          <Minimize2 size={20} />
+          className="fixed top-4 sm:top-8 right-4 sm:right-8 z-[200] p-3 sm:p-4 bg-white/10 backdrop-blur-2xl border border-white/20 text-white rounded-full hover:bg-white/20 hover:scale-110 transition-all shadow-2xl">
+          <Minimize2 size={18} />
         </button>
       )}
 
       {/* ── MAIN SCROLL AREA ── */}
       <div className="flex-1 flex overflow-hidden">
         <div
+          ref={editorAreaRef}
           className={`flex-1 overflow-y-auto relative scroll-smooth scrollbar-hide`}
           style={{ ...bgPatternClass }}
         >
@@ -744,22 +819,22 @@ export function NoteEditor() {
           {/* Cover image */}
           <div className="relative group">
             {coverImage !== 'none' ? (
-              <div className={`relative w-full overflow-hidden transition-all duration-[1.5s] ${focusMode ? 'h-[20vh]' : 'h-[42vh]'}`}>
+              <div className={`relative w-full overflow-hidden transition-all duration-[1.5s] ${focusMode ? 'h-[15vh] sm:h-[20vh]' : 'h-[28vh] sm:h-[42vh]'}`}>
                 <img src={coverImage} alt="" className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-[3s] ease-out" />
                 <div className={`absolute inset-0 bg-gradient-to-b from-transparent via-black/10 ${isDark ? 'to-[#0d0d0d]' : activeTheme === 'sepia' ? 'to-[#FBF0D9]' : 'to-[#FCFCFC]'}`} />
               </div>
-            ) : <div className="h-24" />}
+            ) : <div className="h-16 sm:h-24" />}
 
             <button onClick={() => setShowCoverPicker(!showCoverPicker)}
-              className="absolute top-6 right-6 px-5 py-2.5 bg-black/40 hover:bg-black/60 backdrop-blur-xl border border-white/20 rounded-full text-white text-sm font-bold opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center gap-2 shadow-xl hover:scale-105">
-              <Palette size={14} /> Change Cover
+              className="absolute top-4 sm:top-6 right-4 sm:right-6 px-3 sm:px-5 py-2 sm:py-2.5 bg-black/40 hover:bg-black/60 backdrop-blur-xl border border-white/20 rounded-full text-white text-xs sm:text-sm font-bold opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center gap-2 shadow-xl hover:scale-105">
+              <Palette size={12} /> <span className="hidden sm:inline">Change Cover</span>
             </button>
 
             {showCoverPicker && (
-              <div className={`absolute right-6 top-16 w-80 rounded-[32px] border shadow-2xl p-4 z-50 grid grid-cols-2 gap-3 backdrop-blur-[60px] ${isDark ? 'bg-[#111]/90 border-white/8' : 'bg-white/90 border-black/8'}`}>
+              <div className={`absolute right-4 sm:right-6 top-14 sm:top-16 w-64 sm:w-80 rounded-[28px] sm:rounded-[32px] border shadow-2xl p-3 sm:p-4 z-50 grid grid-cols-2 gap-2 sm:gap-3 backdrop-blur-[60px] ${isDark ? 'bg-[#111]/90 border-white/8' : 'bg-white/90 border-black/8'}`}>
                 {COVER_IMAGES.map((img, i) => (
                   <button key={i} onClick={() => { setCoverImage(img); setShowCoverPicker(false); }}
-                    className={`h-20 rounded-2xl overflow-hidden border-2 transition-all ${coverImage === img ? 'border-indigo-500 scale-[0.96]' : 'border-transparent hover:scale-[1.03] hover:shadow-lg'}`}>
+                    className={`h-16 sm:h-20 rounded-2xl overflow-hidden border-2 transition-all ${coverImage === img ? 'border-indigo-500 scale-[0.96]' : 'border-transparent hover:scale-[1.03] hover:shadow-lg'}`}>
                     {img === 'none'
                       ? <div className={`w-full h-full flex items-center justify-center text-xs font-bold ${isDark ? 'bg-white/5 text-gray-500' : 'bg-black/5 text-gray-400'}`}>Minimal</div>
                       : <img src={img} alt="" className="w-full h-full object-cover" />
@@ -774,13 +849,13 @@ export function NoteEditor() {
           <div className={`relative z-10 mx-auto transition-all duration-1000 ${fullWidth ? 'max-w-[96%]' : 'max-w-[1080px]'}`}>
 
             {/* Page icon */}
-            <div className="relative -mt-24 ml-10 mb-8 inline-block z-20">
+            <div className="relative -mt-16 sm:-mt-24 ml-4 sm:ml-10 mb-4 sm:mb-8 inline-block z-20">
               <button onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                className="text-[100px] leading-none drop-shadow-2xl hover:scale-110 hover:-rotate-6 transition-transform duration-500 select-none block">
+                className="text-[60px] sm:text-[100px] leading-none drop-shadow-2xl hover:scale-110 hover:-rotate-6 transition-transform duration-500 select-none block">
                 {pageIcon}
               </button>
               {showEmojiPicker && (
-                <div className={`absolute left-0 top-full mt-3 w-80 rounded-[28px] border shadow-2xl p-4 grid grid-cols-5 gap-2 z-50 backdrop-blur-[60px] ${isDark ? 'bg-[#111]/90 border-white/8' : 'bg-white/90 border-black/8'}`}>
+                <div className={`absolute left-0 top-full mt-3 w-72 sm:w-80 rounded-[28px] border shadow-2xl p-4 grid grid-cols-5 gap-2 z-50 backdrop-blur-[60px] ${isDark ? 'bg-[#111]/90 border-white/8' : 'bg-white/90 border-black/8'}`}>
                   {EMOJI_LIST.map(e => (
                     <button key={e} onClick={() => { setPageIcon(e); setShowEmojiPicker(false); }}
                       className={`text-3xl aspect-square flex items-center justify-center rounded-2xl hover:scale-125 transition-transform ${isDark ? 'hover:bg-white/10' : 'hover:bg-black/5'}`}>{e}</button>
@@ -790,21 +865,23 @@ export function NoteEditor() {
             </div>
 
             {/* Title */}
-            <div className="px-10 pb-6">
+            <div className="px-4 sm:px-10 pb-4 sm:pb-6">
               {editingTitle ? (
                 <input
                   autoFocus
-                  className={`text-[5.5rem] font-black w-full outline-none bg-transparent tracking-tighter leading-[1.05] placeholder-gray-500/40 ${isDark ? 'text-white' : activeTheme === 'sepia' ? 'text-[#3E3224]' : 'text-gray-900'}`}
+                  className={`text-[2.2rem] sm:text-[4rem] lg:text-[5.5rem] font-black w-full outline-none bg-transparent tracking-tighter leading-[1.05] placeholder-gray-500/40 ${isDark ? 'text-white' : activeTheme === 'sepia' ? 'text-[#3E3224]' : 'text-gray-900'}`}
                   value={note.title}
                   onChange={(e) => updateNote(note.id, { title: e.target.value })}
                   onBlur={() => setEditingTitle(false)}
                   onKeyDown={(e) => e.key === 'Enter' && setEditingTitle(false)}
                   placeholder="Untitled Matrix..."
+                  style={{ fontSize: 'clamp(1.8rem, 6vw, 5.5rem)' }}
                 />
               ) : (
                 <h1
                   onClick={() => setEditingTitle(true)}
-                  className={`text-[5.5rem] font-black cursor-text hover:opacity-75 transition-opacity tracking-tighter leading-[1.05] ${isDark ? 'text-white' : activeTheme === 'sepia' ? 'text-[#3E3224]' : 'text-gray-900'}`}
+                  className={`font-black cursor-text hover:opacity-75 transition-opacity tracking-tighter leading-[1.05] ${isDark ? 'text-white' : activeTheme === 'sepia' ? 'text-[#3E3224]' : 'text-gray-900'}`}
+                  style={{ fontSize: 'clamp(1.8rem, 6vw, 5.5rem)' }}
                 >
                   {note.title || 'Untitled Matrix'}
                 </h1>
@@ -812,7 +889,7 @@ export function NoteEditor() {
             </div>
 
             {/* ── TAB SWITCHER ── */}
-            <div className="px-10 mb-8">
+            <div className="px-4 sm:px-10 mb-6 sm:mb-8 overflow-x-auto no-scrollbar">
               <TabBar activeTab={activeTab} onChange={handleTabChange} isDark={isDark} />
             </div>
 
@@ -824,11 +901,24 @@ export function NoteEditor() {
 
               {/* ──────────── WRITE TAB ──────────── */}
               {activeTab === 'write' && (
-                <div className="px-10 pb-10">
+                <div className="px-4 sm:px-10 pb-10">
                   {/* Mini image bar above editor */}
-                  <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center justify-between mb-4 gap-2 flex-wrap">
                     <p className={`text-xs font-black uppercase tracking-widest ${isDark ? 'text-gray-600' : 'text-gray-400'}`}>Rich Text Canvas</p>
-                    <ImageInsertBar onInsert={insertImage} isDark={isDark} />
+                    <div className="flex items-center gap-2">
+                      <ImageInsertBar onInsert={insertImage} isDark={isDark} />
+                      {/* Annotate button */}
+                      <button
+                        onClick={() => setShowAnnotate(true)}
+                        title="Annotate (iOS Markup / Canvas)"
+                        className={`flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-2xl text-sm font-bold transition-all hover:scale-105 border ${
+                          isDark ? 'bg-white/5 hover:bg-white/10 text-violet-300 border-violet-500/20' : 'bg-violet-50 hover:bg-violet-100 text-violet-600 border-violet-200'
+                        }`}
+                      >
+                        <Pencil size={14} className="text-violet-400" />
+                        <span className="hidden sm:inline">Annotate</span>
+                      </button>
+                    </div>
                   </div>
 
                   {/* Editor */}
@@ -850,35 +940,35 @@ export function NoteEditor() {
 
               {/* ──────────── CANVAS TAB ──────────── */}
               {activeTab === 'canvas' && (
-                <div className="px-10 pb-10">
-                  <div className="flex items-center justify-between mb-6">
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-[18px] bg-gradient-to-br from-pink-500 to-rose-600 flex items-center justify-center shadow-xl shadow-pink-500/30">
-                        <Shapes size={22} className="text-white" />
+                <div className="px-4 sm:px-10 pb-10">
+                  <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
+                    <div className="flex items-center gap-3 sm:gap-4">
+                      <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-[16px] sm:rounded-[18px] bg-gradient-to-br from-pink-500 to-rose-600 flex items-center justify-center shadow-xl shadow-pink-500/30">
+                        <Shapes size={20} className="text-white" />
                       </div>
                       <div>
-                        <h3 className={`text-xl font-black ${isDark ? 'text-white' : 'text-gray-900'}`}>Freeform Board</h3>
-                        <p className={`text-sm font-medium ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Infinite vector canvas — draw, sketch, diagram</p>
+                        <h3 className={`text-lg sm:text-xl font-black ${isDark ? 'text-white' : 'text-gray-900'}`}>Freeform Board</h3>
+                        <p className={`text-xs sm:text-sm font-medium ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Infinite canvas — draw, sketch, diagram</p>
                       </div>
                     </div>
-                    <ImageInsertBar onInsert={(src) => toast.success('Image added to canvas')} isDark={isDark} />
+                    <ImageInsertBar onInsert={(_src) => toast.success('Image added to canvas')} isDark={isDark} />
                   </div>
 
-                  <div className={`rounded-[40px] overflow-hidden border shadow-[0_20px_60px_rgba(0,0,0,0.15)] min-h-[700px] relative flex flex-col ${isDark ? 'bg-black/40 border-white/8' : 'bg-white/70 border-black/8'}`}>
+                  <div className={`rounded-[28px] sm:rounded-[40px] overflow-hidden border shadow-[0_20px_60px_rgba(0,0,0,0.15)] min-h-[400px] sm:min-h-[700px] relative flex flex-col ${isDark ? 'bg-black/40 border-white/8' : 'bg-white/70 border-black/8'}`}>
                     {/* Canvas toolbar */}
-                    <div className={`flex items-center gap-3 px-6 py-4 border-b ${isDark ? 'border-white/[0.06]' : 'border-black/[0.06]'}`}>
+                    <div className={`flex items-center gap-2 sm:gap-3 px-4 sm:px-6 py-3 sm:py-4 border-b overflow-x-auto no-scrollbar ${isDark ? 'border-white/[0.06]' : 'border-black/[0.06]'}`}>
                       {[
                         { icon: MousePointer2, label: 'Select',  color: 'text-indigo-400' },
                         { icon: PenTool,       label: 'Draw',    color: 'text-pink-400' },
                         { icon: Shapes,        label: 'Shapes',  color: 'text-emerald-400' },
                         { icon: Eraser,        label: 'Erase',   color: 'text-amber-400' },
                       ].map(({ icon: Icon, label, color }, i) => (
-                        <button key={label} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all hover:scale-105 border ${
+                        <button key={label} className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all hover:scale-105 border whitespace-nowrap shrink-0 ${
                           i === 0
                             ? isDark ? 'bg-white/10 border-white/15 text-white' : 'bg-black/10 border-black/15 text-black'
                             : isDark ? 'border-transparent text-gray-400 hover:bg-white/5 hover:text-white' : 'border-transparent text-gray-400 hover:bg-black/5 hover:text-black'
                         }`}>
-                          <Icon size={15} className={i === 0 ? '' : color} /> {label}
+                          <Icon size={14} className={i === 0 ? '' : color} /> {label}
                         </button>
                       ))}
                     </div>
@@ -892,45 +982,45 @@ export function NoteEditor() {
 
               {/* ──────────── OCR TAB ──────────── */}
               {activeTab === 'ocr' && (
-                <div className="px-10 pb-10">
-                  <div className="flex items-center justify-between mb-6">
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-[18px] bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center shadow-xl shadow-sky-500/30">
-                        <Brain size={22} className="text-white" />
+                <div className="px-4 sm:px-10 pb-10">
+                  <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
+                    <div className="flex items-center gap-3 sm:gap-4">
+                      <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-[16px] sm:rounded-[18px] bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center shadow-xl shadow-sky-500/30">
+                        <Brain size={20} className="text-white" />
                       </div>
                       <div>
-                        <h3 className={`text-xl font-black ${isDark ? 'text-white' : 'text-gray-900'}`}>Cognitive OCR</h3>
-                        <p className={`text-sm font-medium ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Neural handwriting recognition — write to transcribe</p>
+                        <h3 className={`text-lg sm:text-xl font-black ${isDark ? 'text-white' : 'text-gray-900'}`}>Cognitive OCR</h3>
+                        <p className={`text-xs sm:text-sm font-medium ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Neural handwriting recognition</p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <ImageInsertBar onInsert={(src) => toast.success('Image added to OCR pad')} isDark={isDark} />
-                      <div className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-sm font-bold border ${isDark ? 'bg-white/5 border-white/10 text-gray-300' : 'bg-black/5 border-black/10 text-gray-600'}`}>
-                        <ScanLine size={15} className="text-sky-400 animate-pulse" />
-                        <span>OCR Active</span>
+                    <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+                      <ImageInsertBar onInsert={(_src) => toast.success('Image added to OCR pad')} isDark={isDark} />
+                      <div className={`flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-bold border ${isDark ? 'bg-white/5 border-white/10 text-gray-300' : 'bg-black/5 border-black/10 text-gray-600'}`}>
+                        <ScanLine size={14} className="text-sky-400 animate-pulse" />
+                        <span className="hidden sm:inline">OCR Active</span>
                       </div>
                     </div>
                   </div>
 
-                  <div className={`rounded-[40px] overflow-hidden border shadow-[0_20px_60px_rgba(0,0,0,0.15)] min-h-[700px] relative ${isDark ? 'bg-black/40 border-white/8' : 'bg-white/70 border-black/8'}`}>
+                  <div className={`rounded-[28px] sm:rounded-[40px] overflow-hidden border shadow-[0_20px_60px_rgba(0,0,0,0.15)] min-h-[400px] sm:min-h-[700px] relative ${isDark ? 'bg-black/40 border-white/8' : 'bg-white/70 border-black/8'}`}>
                     {/* OCR toolbar */}
-                    <div className={`flex items-center justify-between px-6 py-4 border-b ${isDark ? 'border-white/[0.06]' : 'border-black/[0.06]'}`}>
-                      <div className="flex items-center gap-3">
+                    <div className={`flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b ${isDark ? 'border-white/[0.06]' : 'border-black/[0.06]'}`}>
+                      <div className="flex items-center gap-2 sm:gap-3">
                         {[
                           { icon: PenTool, label: 'Pen',   color: 'text-blue-400' },
                           { icon: Eraser,  label: 'Erase', color: 'text-rose-400' },
                         ].map(({ icon: Icon, label, color }, i) => (
-                          <button key={label} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all hover:scale-105 border ${
+                          <button key={label} className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all hover:scale-105 border ${
                             i === 0
                               ? isDark ? 'bg-sky-500/15 border-sky-500/30 text-sky-300' : 'bg-sky-500/10 border-sky-500/20 text-sky-600'
                               : isDark ? 'border-transparent text-gray-400 hover:bg-white/5 hover:text-white' : 'border-transparent text-gray-400 hover:bg-black/5 hover:text-black'
                           }`}>
-                            <Icon size={15} className={i === 0 ? '' : color} /> {label}
+                            <Icon size={14} className={i === 0 ? '' : color} /> {label}
                           </button>
                         ))}
                       </div>
-                      <button className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold bg-gradient-to-r from-sky-500 to-blue-600 text-white shadow-lg shadow-sky-500/30 hover:shadow-sky-500/50 hover:-translate-y-0.5 transition-all`}>
-                        <ChevronRight size={16} /> Transcribe to Note
+                      <button className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold bg-gradient-to-r from-sky-500 to-blue-600 text-white shadow-lg shadow-sky-500/30 hover:shadow-sky-500/50 hover:-translate-y-0.5 transition-all`}>
+                        <ChevronRight size={14} /> <span className="hidden sm:inline">Transcribe to Note</span><span className="sm:hidden">Transcribe</span>
                       </button>
                     </div>
 
@@ -946,9 +1036,9 @@ export function NoteEditor() {
 
         {/* ── SPLIT SIDEBAR ── */}
         {splitMode && !focusMode && (
-          <div className={`w-[440px] border-l overflow-y-auto z-30 flex flex-col gap-6 p-8 shrink-0 backdrop-blur-3xl animate-in slide-in-from-right-8 duration-400 ${isDark ? 'bg-black/40 border-white/[0.06]' : 'bg-white/60 border-black/[0.06]'}`}>
-            <div className={`rounded-[36px] p-8 border ${isDark ? 'bg-white/[0.03] border-white/8' : 'bg-white/80 border-black/8 shadow-lg'}`}>
-              <h3 className={`text-lg font-black mb-6 flex items-center gap-3 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+          <div className={`hidden lg:flex w-[380px] xl:w-[440px] border-l overflow-y-auto z-30 flex-col gap-6 p-6 xl:p-8 shrink-0 backdrop-blur-3xl animate-in slide-in-from-right-8 duration-400 ${isDark ? 'bg-black/40 border-white/[0.06]' : 'bg-white/60 border-black/[0.06]'}`}>
+            <div className={`rounded-[28px] xl:rounded-[36px] p-6 xl:p-8 border ${isDark ? 'bg-white/[0.03] border-white/8' : 'bg-white/80 border-black/8 shadow-lg'}`}>
+              <h3 className={`text-base xl:text-lg font-black mb-4 xl:mb-6 flex items-center gap-3 ${isDark ? 'text-white' : 'text-gray-900'}`}>
                 <div className="p-2.5 bg-indigo-500/15 rounded-2xl text-indigo-400"><Layers size={20} /></div>
                 Document Cortex
               </h3>
@@ -960,39 +1050,39 @@ export function NoteEditor() {
 
       {/* ── FLOATING DOCK ── */}
       {!focusMode && (
-        <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[100]">
-          <div className={`backdrop-blur-[70px] border shadow-[0_40px_80px_-20px_rgba(0,0,0,0.6)] px-4 py-4 rounded-[44px] flex items-center gap-1.5 ${isDark ? 'bg-[#0f0f14]/80 border-white/10 text-white' : 'bg-white/80 border-black/8 text-gray-900'}`}>
+        <div className="fixed bottom-4 sm:bottom-10 left-1/2 -translate-x-1/2 z-[100] px-2 sm:px-0 max-w-full">
+          <div className={`backdrop-blur-[70px] border shadow-[0_40px_80px_-20px_rgba(0,0,0,0.6)] px-2 sm:px-4 py-3 sm:py-4 rounded-[36px] sm:rounded-[44px] flex items-center gap-1 sm:gap-1.5 overflow-x-auto no-scrollbar ${isDark ? 'bg-[#0f0f14]/80 border-white/10 text-white' : 'bg-white/80 border-black/8 text-gray-900'}`}>
 
-            <ToolbarBtn onClick={() => editor?.chain().focus().undo().run()} isDark={isDark}><Undo2 size={20} /></ToolbarBtn>
-            <ToolbarBtn onClick={() => editor?.chain().focus().redo().run()} isDark={isDark}><Redo2 size={20} /></ToolbarBtn>
+            <ToolbarBtn onClick={() => editor?.chain().focus().undo().run()} isDark={isDark}><Undo2 size={18} /></ToolbarBtn>
+            <ToolbarBtn onClick={() => editor?.chain().focus().redo().run()} isDark={isDark}><Redo2 size={18} /></ToolbarBtn>
             <Divider isDark={isDark} />
 
-            <ToolbarBtn onClick={() => editor?.chain().focus().toggleBold().run()} active={editor?.isActive('bold')} isDark={isDark}><Bold size={20} /></ToolbarBtn>
-            <ToolbarBtn onClick={() => editor?.chain().focus().toggleItalic().run()} active={editor?.isActive('italic')} isDark={isDark}><Italic size={20} /></ToolbarBtn>
-            <ToolbarBtn onClick={() => editor?.chain().focus().toggleUnderline().run()} active={editor?.isActive('underline')} isDark={isDark}><UnderlineIcon size={20} /></ToolbarBtn>
+            <ToolbarBtn onClick={() => editor?.chain().focus().toggleBold().run()} active={editor?.isActive('bold')} isDark={isDark}><Bold size={18} /></ToolbarBtn>
+            <ToolbarBtn onClick={() => editor?.chain().focus().toggleItalic().run()} active={editor?.isActive('italic')} isDark={isDark}><Italic size={18} /></ToolbarBtn>
+            <ToolbarBtn onClick={() => editor?.chain().focus().toggleUnderline().run()} active={editor?.isActive('underline')} isDark={isDark}><UnderlineIcon size={18} /></ToolbarBtn>
             <Divider isDark={isDark} />
 
             {/* Text color */}
-            <div className={`relative p-3.5 rounded-3xl transition-all cursor-pointer border hover:scale-110 ${isDark ? 'hover:bg-white/10 border-transparent text-gray-300' : 'hover:bg-black/5 border-transparent text-gray-600'}`}>
-              <Type size={20} />
+            <div className={`relative p-3 rounded-3xl transition-all cursor-pointer border hover:scale-110 ${isDark ? 'hover:bg-white/10 border-transparent text-gray-300' : 'hover:bg-black/5 border-transparent text-gray-600'}`}>
+              <Type size={18} />
               <input type="color" className="absolute inset-0 opacity-0 w-full h-full cursor-pointer" onChange={(e) => editor?.chain().focus().setColor(e.target.value).run()} />
             </div>
 
             {/* Highlight */}
-            <div className={`relative p-3.5 rounded-3xl transition-all cursor-pointer border hover:scale-110 ${isDark ? 'hover:bg-white/10 border-transparent text-gray-300' : 'hover:bg-black/5 border-transparent text-gray-600'}`}>
-              <Highlighter size={20} />
+            <div className={`relative p-3 rounded-3xl transition-all cursor-pointer border hover:scale-110 ${isDark ? 'hover:bg-white/10 border-transparent text-gray-300' : 'hover:bg-black/5 border-transparent text-gray-600'}`}>
+              <Highlighter size={18} />
               <input type="color" defaultValue="#fde68a" className="absolute inset-0 opacity-0 w-full h-full cursor-pointer" onChange={(e) => editor?.chain().focus().toggleHighlight({ color: e.target.value }).run()} />
             </div>
 
             <Divider isDark={isDark} />
-            <ToolbarBtn onClick={() => editor?.chain().focus().toggleHeading({ level: 1 }).run()} active={editor?.isActive('heading', { level: 1 })} isDark={isDark}><Heading1 size={20} /></ToolbarBtn>
-            <ToolbarBtn onClick={() => editor?.chain().focus().toggleHeading({ level: 2 }).run()} active={editor?.isActive('heading', { level: 2 })} isDark={isDark}><Heading2 size={20} /></ToolbarBtn>
-            <ToolbarBtn onClick={() => editor?.chain().focus().toggleBulletList().run()} active={editor?.isActive('bulletList')} isDark={isDark}><List size={20} /></ToolbarBtn>
+            <ToolbarBtn onClick={() => editor?.chain().focus().toggleHeading({ level: 1 }).run()} active={editor?.isActive('heading', { level: 1 })} isDark={isDark}><Heading1 size={18} /></ToolbarBtn>
+            <ToolbarBtn onClick={() => editor?.chain().focus().toggleHeading({ level: 2 }).run()} active={editor?.isActive('heading', { level: 2 })} isDark={isDark}><Heading2 size={18} /></ToolbarBtn>
+            <ToolbarBtn onClick={() => editor?.chain().focus().toggleBulletList().run()} active={editor?.isActive('bulletList')} isDark={isDark}><List size={18} /></ToolbarBtn>
             <Divider isDark={isDark} />
 
             {/* Image upload from dock */}
-            <div className={`relative p-3.5 rounded-3xl transition-all cursor-pointer border hover:scale-110 ${isDark ? 'hover:bg-white/10 border-transparent' : 'hover:bg-black/5 border-transparent'}`}>
-              <ImageIcon size={20} className="text-emerald-400" />
+            <div className={`relative p-3 rounded-3xl transition-all cursor-pointer border hover:scale-110 ${isDark ? 'hover:bg-white/10 border-transparent' : 'hover:bg-black/5 border-transparent'}`}>
+              <ImageIcon size={18} className="text-emerald-400" />
               <input type="file" accept="image/*" className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
                 onChange={(e) => {
                   const file = e.target.files?.[0];
@@ -1005,13 +1095,20 @@ export function NoteEditor() {
               />
             </div>
 
+            {/* Annotate button in dock */}
+            <ToolbarBtn onClick={() => setShowAnnotate(true)} isDark={isDark}>
+              <Pencil size={18} className="text-violet-400" />
+            </ToolbarBtn>
+
+            <Divider isDark={isDark} />
+
             {/* AI Button */}
-            <div className="ml-2">
+            <div className="ml-1">
               <button
                 onClick={() => setShowAiModal(true)}
-                className={`flex items-center justify-center p-4 rounded-[28px] shadow-2xl transition-all duration-500 bg-gradient-to-br from-violet-500 via-purple-500 to-pink-500 text-white hover:scale-110 hover:-translate-y-2 hover:shadow-purple-500/50 ${aiGenerating ? 'opacity-70 animate-pulse' : ''}`}
+                className={`flex items-center justify-center p-3.5 sm:p-4 rounded-[24px] sm:rounded-[28px] shadow-2xl transition-all duration-500 bg-gradient-to-br from-violet-500 via-purple-500 to-pink-500 text-white hover:scale-110 hover:-translate-y-2 hover:shadow-purple-500/50 ${aiGenerating ? 'opacity-70 animate-pulse' : ''}`}
               >
-                <Wand2 size={24} className={aiGenerating ? 'animate-spin' : 'animate-pulse'} />
+                <Wand2 size={20} className={aiGenerating ? 'animate-spin' : 'animate-pulse'} />
               </button>
             </div>
           </div>
@@ -1029,30 +1126,68 @@ export function NoteEditor() {
 
       {/* ── GENERATED ASSET PREVIEW ── */}
       {generatedAsset && (
-        <div className="fixed inset-0 z-[400] flex items-center justify-center p-8 bg-black/50 backdrop-blur-2xl">
-          <div className={`w-full max-w-xl rounded-[52px] border shadow-[0_80px_160px_rgba(0,0,0,0.7)] p-10 relative overflow-hidden ${isDark ? 'bg-[#0f0f14]/90 border-white/10' : 'bg-white/90 border-black/8'}`}
+        <div className="fixed inset-0 z-[400] flex items-center justify-center p-4 sm:p-8 bg-black/50 backdrop-blur-2xl">
+          <div className={`w-full max-w-xl rounded-[36px] sm:rounded-[52px] border shadow-[0_80px_160px_rgba(0,0,0,0.7)] p-6 sm:p-10 relative overflow-hidden ${isDark ? 'bg-[#0f0f14]/90 border-white/10' : 'bg-white/90 border-black/8'}`}
             style={{ animation: 'scaleIn 0.5s cubic-bezier(0.23,1,0.32,1)' }}>
             <div className="absolute inset-0 bg-gradient-to-br from-violet-500/10 via-transparent to-pink-500/10 rounded-[52px] pointer-events-none" />
             <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-violet-500 via-pink-500 to-cyan-500" />
 
-            <div className="flex items-center justify-between mb-8 relative z-10">
-              <h3 className={`text-2xl font-black flex items-center gap-4 ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                <div className="w-12 h-12 rounded-[18px] bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-2xl shadow-purple-500/40 text-white"><Sparkles size={22} /></div>
+            <div className="flex items-center justify-between mb-6 sm:mb-8 relative z-10">
+              <h3 className={`text-lg sm:text-2xl font-black flex items-center gap-3 sm:gap-4 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-[16px] sm:rounded-[18px] bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-2xl shadow-purple-500/40 text-white"><Sparkles size={20} /></div>
                 Synthesis Complete
               </h3>
-              <button onClick={() => setGeneratedAsset(null)} className={`p-3 rounded-2xl transition-all hover:scale-110 ${isDark ? 'bg-white/5 hover:bg-white/10 text-gray-400' : 'bg-black/5 hover:bg-black/10 text-gray-500'}`}><X size={18} /></button>
+              <div className="flex items-center gap-2">
+                {/* Open in 3D viewer button */}
+                {generatedAsset.action === '3d' && (
+                  <button
+                    onClick={() => { setFloating3D({ src: generatedAsset.assetUrl, title: `🧊 ${generatedAsset.prompt || '3D Model'}` }); }}
+                    className={`p-2.5 rounded-2xl transition-all hover:scale-110 text-violet-400 ${isDark ? 'bg-violet-500/10 hover:bg-violet-500/20' : 'bg-violet-50 hover:bg-violet-100'}`}
+                    title="View in 3D Viewer"
+                  >
+                    <Box size={16} />
+                  </button>
+                )}
+                <button onClick={() => setGeneratedAsset(null)} className={`p-2.5 sm:p-3 rounded-2xl transition-all hover:scale-110 ${isDark ? 'bg-white/5 hover:bg-white/10 text-gray-400' : 'bg-black/5 hover:bg-black/10 text-gray-500'}`}><X size={16} /></button>
+              </div>
             </div>
 
-            <div className={`rounded-[36px] overflow-hidden mb-8 border relative z-10 ${isDark ? 'bg-black/40 border-white/[0.06]' : 'bg-gray-50 border-black/[0.06]'}`} style={{ height: '360px' }}>
+            <div className={`rounded-[28px] sm:rounded-[36px] overflow-hidden mb-6 sm:mb-8 border relative z-10 ${isDark ? 'bg-black/40 border-white/[0.06]' : 'bg-gray-50 border-black/[0.06]'}`} style={{ height: '240px', maxHeight: '40vh' }}>
               <img src={generatedAsset.assetUrl} alt="" className="w-full h-full object-contain p-4" />
             </div>
 
-            <div className="flex gap-4 relative z-10">
-              <button onClick={() => setGeneratedAsset(null)} className={`flex-1 py-4 rounded-[24px] font-bold text-sm transition-all hover:scale-105 border ${isDark ? 'bg-white/5 hover:bg-white/8 text-white border-white/10' : 'bg-black/5 hover:bg-black/8 text-black border-black/10'}`}>Discard</button>
-              <button onClick={insertGeneratedAsset} className="flex-[2] py-4 rounded-[24px] font-black text-sm text-white bg-gradient-to-r from-violet-500 via-purple-500 to-pink-500 hover:from-violet-600 hover:to-pink-600 shadow-xl shadow-purple-500/30 hover:-translate-y-0.5 hover:shadow-purple-500/50 transition-all">Embed into Canvas</button>
+            <div className="flex gap-3 sm:gap-4 relative z-10">
+              <button onClick={() => setGeneratedAsset(null)} className={`flex-1 py-3 sm:py-4 rounded-[20px] sm:rounded-[24px] font-bold text-sm transition-all hover:scale-105 border ${isDark ? 'bg-white/5 hover:bg-white/8 text-white border-white/10' : 'bg-black/5 hover:bg-black/8 text-black border-black/10'}`}>Discard</button>
+              <button onClick={insertGeneratedAsset} className="flex-[2] py-3 sm:py-4 rounded-[20px] sm:rounded-[24px] font-black text-sm text-white bg-gradient-to-r from-violet-500 via-purple-500 to-pink-500 hover:from-violet-600 hover:to-pink-600 shadow-xl shadow-purple-500/30 hover:-translate-y-0.5 hover:shadow-purple-500/50 transition-all">Embed into Canvas</button>
             </div>
           </div>
         </div>
+      )}
+
+      {/* ── FLOATING 3D VIEWER ── */}
+      {floating3D && (
+        <Model3DViewer
+          src={floating3D.src}
+          title={floating3D.title}
+          onClose={() => setFloating3D(null)}
+          onInsert={() => {
+            insertImage(floating3D.src);
+            setFloating3D(null);
+            toast.success('3D asset embedded.');
+          }}
+        />
+      )}
+
+      {/* ── ANNOTATION OVERLAY ── */}
+      {showAnnotate && (
+        <AnnotateOverlay
+          onClose={() => setShowAnnotate(false)}
+          onSave={(dataUrl) => {
+            insertImage(dataUrl);
+            setShowAnnotate(false);
+            toast.success('Annotation inserted into note.');
+          }}
+        />
       )}
 
       <style>{`
